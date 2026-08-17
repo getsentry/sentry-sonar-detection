@@ -10,7 +10,8 @@ dashboard giving an overview of all rooms and how they're used.
 
 ## Scope
 
-- **4 meeting rooms.**
+- **4 meeting rooms:** Makava Kingdom, Urwald, Wednesday, Servus
+  (ids `makava-kingdom`, `urwald`, `wednesday`, `servus`).
 - **4 full room kits** (4 of each device).
 
 ## Hardware (per room)
@@ -331,7 +332,6 @@ against a real, working API.
 
 ## Open items
 
-- Room naming / IDs for the 4 rooms.
 - WiFi network + credentials strategy for provisioning 4 sensor + 4 display nodes.
 - Collect the office **static egress IPs** (all sites/WAN links + IPv6) for the
   CIDR allowlist; confirm they're truly static.
