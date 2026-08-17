@@ -157,8 +157,8 @@ api_tokens (                      -- device auth (see Authentication section)
 |---|---|---|---|---|
 | `POST` | `/events` | sensor node | device token — **write**, that room | heartbeat / state |
 | `GET` | `/rooms/:id` | display node | device token — **read**, that room | one room's derived status |
-| `GET` | `/rooms` | dashboard | **Cloudflare Access** (human) | all rooms + status |
-| `GET` | `/rooms/:id/stats` | dashboard | **Cloudflare Access** (human) | utilization over time (later) |
+| `GET` | `/rooms` | dashboard | **office IP or Access** | all rooms + status |
+| `GET` | `/rooms/:id/stats` | dashboard | **office IP or Access** | utilization over time (later) |
 
 See the next section for how each auth type works.
 
@@ -198,32 +198,60 @@ less code, instantly **revocable** (flip `revoked`), and trivial to reason about
 No key rotation or token-expiry machinery to build. Enforcing "this exact room,
 this one action" is a two-field check.
 
-### Dashboard auth — Cloudflare Access (recommended)
+### Dashboard auth — office IP **or** Cloudflare Access
 
-Put **Cloudflare Access** in front of the dashboard **and** its API read routes
-(`GET /rooms`, `/rooms/:id/stats`):
+The dashboard is low-sensitivity, glanceable, and consumed **in the office**
+(wall-mounted screens, people on the floor), so the primary gate is the office
+network — with SSO as an escape hatch for remote use. We protect the dashboard
+**and** its API read routes (`GET /rooms`, `/rooms/:id/stats`) with a single
+policy:
 
-- Access authenticates humans via SSO / email OTP and issues a signed JWT,
-  presented as the `Cf-Access-Jwt-Assertion` header (and a cookie the browser
-  sends automatically).
-- The Worker **verifies that JWT** against your Access application's public keys
-  before serving room data. No valid Access session → no data.
-- Policy = restrict to your company email domain (or a specific list). Free for
-  up to 50 users — trivial to set up in the Zero Trust dashboard.
+> **Allow if the request comes from an office egress IP, _OR_ if the user is an
+> authenticated `@company.com` account.**
+
+- **In the office** → matched by IP → **no login**, the screen just works.
+- **Anywhere else** → falls through to **Cloudflare Access** SSO / email-OTP.
+
+This is a **Cloudflare Access** application with two policies (Access natively
+supports an IP-range selector alongside identity), which keeps everything in one
+place. Access issues a signed JWT (`Cf-Access-Jwt-Assertion` header + cookie);
+the Worker **verifies it** against the Access public keys before serving data, so
+the origin can't be reached directly around the gate.
+
+*Lighter alternative if we skip Zero Trust entirely:* a **WAF custom rule** (or a
+~5-line Worker check on `CF-Connecting-IP`) that allows `/rooms*` only from the
+office IPs. Simplest possible, but IP-only — no remote access, no per-user audit.
+
+**Prepare for multiple office egress IPs.** Offices commonly present several
+static egress IPs (multiple WAN links, NAT pools, sites), plus IPv6. So model the
+allowlist as a **list of CIDRs**, not a single address:
+
+```
+OFFICE_IP_RANGES = [
+  "203.0.113.0/29",     # site A WAN pool (v4)
+  "198.51.100.42/32",   # site B static (v4)
+  "2001:db8:1234::/48", # office IPv6 range
+]
+```
+
+Keep this list in one place — a Cloudflare **IP List** (referenced by the Access
+policy / WAF rule) or a Worker env var — so adding a site is a one-line change.
+Match against `CF-Connecting-IP` (trustworthy; set by Cloudflare).
 
 **Why not a shared read token in the frontend?** Anything shipped in browser JS
-is copyable, so a bearer token there is not "reliable auth" — anyone who opens
-devtools could query all rooms. Access ties data access to an authenticated
-human instead. That directly satisfies "other services/pages cannot easily query
-the rooms data."
+is copyable, so a bearer token there isn't "reliable auth." IP + Access ties data
+access to the office network or an authenticated human — satisfying "other
+services/pages cannot easily query the rooms data."
 
 To make the browser→API call carry the Access session automatically, serve the
 API and dashboard under **one root domain** (e.g. `sonar.example.com` +
-`api.example.com`, one Access app covering both), so the Access cookie applies.
+`api.example.com`, one Access app covering both), so the Access cookie and the
+IP rule apply to both.
 
-*Fallback if Zero Trust is unavailable:* a single dashboard password that mints a
-short-lived signed, `httpOnly` session cookie the Worker verifies. Weaker and
-more code than Access — only if Access is off the table.
+**Caveats to keep in mind:** IP matching is coarse — anyone on an allowlisted
+network (incl. **guest WiFi** sharing the same egress IP) is treated as
+in-office; acceptable for occupancy data. Confirm the office IPs are truly static
+and keep the CIDR list current as network changes.
 
 ### Provisioning & hygiene
 
@@ -279,13 +307,18 @@ against a real, working API.
 - Radar via GPIO OUT pin first, UART later. ✅
 - Sentry SDK on backend + frontend, **v11 alpha (`11.0.0-alpha.1`, `next` tag)**,
   set up per the repo's `MIGRATION.md` (not the stable v10 docs). ✅
-- Auth: **per-room, per-scope device bearer tokens** (D1-backed) for IoT;
-  **Cloudflare Access** for the human dashboard + its API read routes. ✅
+- Auth: **per-room, per-scope device bearer tokens** (D1-backed) for IoT; for the
+  dashboard + its API read routes, **office IP OR Cloudflare Access** — in-office
+  is login-free, remote falls through to SSO. Allowlist modeled as a **list of
+  CIDRs** (multiple static office IPs + IPv6). ✅
 
 ## Open items
 
 - Room naming / IDs for the 4 rooms.
 - WiFi network + credentials strategy for provisioning 4 sensor + 4 display nodes.
-- Custom root domain for dashboard + API (needed so one Access app covers both).
+- Custom root domain for dashboard + API (needed so one Access app / IP rule
+  covers both).
+- Collect the office **static egress IPs** (all sites/WAN links + IPv6) for the
+  CIDR allowlist; confirm they're truly static.
 - Physical mounting of sensor node + display at each door.
 - Sentry projects + DSNs (one combined vs. separate backend/frontend projects).
