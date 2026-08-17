@@ -28,7 +28,7 @@ usb_h = 7;         // height (Z) — the USB-C slit (~0.7 cm)
 usb_z0 = 0;        // flush with the inner floor (no gap)
 
 /* ---- Vent slits on the two long walls (+/-Y) ---- */
-vent_w = 1.6;
+vent_w = 1.0;
 vent_h = 26;
 vent_n = 6;
 vent_end_margin = 9;   // keep slits clear of the short ends
