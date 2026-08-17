@@ -10,8 +10,8 @@ dashboard giving an overview of all rooms and how they're used.
 
 ## Scope
 
-- **4 meeting rooms:** Makava Kingdom, Urwald, Wednesday, Servus
-  (ids `makava-kingdom`, `urwald`, `wednesday`, `servus`).
+- **4 meeting rooms:** Makava Kingdom, Urwald, Servus, Oida
+  (ids `makava-kingdom`, `urwald`, `servus`, `oida`).
 - **4 full room kits** (4 of each device).
 
 ## Hardware (per room)
