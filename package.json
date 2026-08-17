@@ -1,0 +1,15 @@
+{
+  "name": "sentry-sonar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meeting-room presence detection with radar sensors, Cloudflare Workers/D1, e-ink displays, and a dashboard",
+  "license": "MIT",
+  "workspaces": [
+    "api",
+    "dashboard"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace api",
+    "dev:dashboard": "npm run dev --workspace dashboard"
+  }
+}
