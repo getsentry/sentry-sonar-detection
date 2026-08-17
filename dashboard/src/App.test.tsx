@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import App from './App'
 
@@ -31,9 +31,13 @@ describe('overview', () => {
   it('lists rooms and links each to its stats page', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => roomsResponse })))
     renderAt('/')
-    await waitFor(() => expect(screen.getByText('Urwald')).toBeTruthy())
-    expect(screen.getByText('In use')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Urwald' }).getAttribute('href')).toBe('/rooms/urwald')
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+    // Scope to the table — the office map may also render an "Urwald" marker.
+    const table = screen.getByRole('table')
+    expect(within(table).getByText('In use')).toBeTruthy()
+    expect(within(table).getByRole('link', { name: 'Urwald' }).getAttribute('href')).toBe(
+      '/rooms/urwald',
+    )
   })
 })
 

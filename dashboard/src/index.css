@@ -177,6 +177,67 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Overview is wider so the floor plan is legible */
+.overview {
+  max-width: 1040px;
+}
+
+/* Office map overlay */
+.map {
+  position: relative;
+  margin-bottom: 1.5rem;
+  line-height: 0;
+}
+
+.map__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: block;
+}
+
+.marker__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.marker--in_use .marker__dot {
+  background: #ef4444;
+  animation: marker-pulse 1.8s ease-out infinite;
+}
+
+.marker--free .marker__dot {
+  background: #22c55e;
+}
+
+.marker--offline .marker__dot {
+  background: #9ca3af;
+}
+
+@keyframes marker-pulse {
+  0% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(239, 68, 68, 0.55);
+  }
+  100% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker--in_use .marker__dot {
+    animation: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .badge--in_use {
     background: #4c1d1a;

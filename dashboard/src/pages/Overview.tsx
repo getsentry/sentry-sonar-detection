@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchRooms, type Room } from '../api'
 import { StatusBadge, relativeTime } from '../ui'
+import OfficeMap from '../components/OfficeMap'
 
 const POLL_MS = 5000
 
@@ -40,7 +41,7 @@ export default function Overview() {
   }, [])
 
   return (
-    <main className="app">
+    <main className="app overview">
       <header className="app__header">
         <h1>Sentry Sonar</h1>
         <p className="app__subtitle">Meeting-room availability</p>
@@ -48,6 +49,8 @@ export default function Overview() {
 
       {error && <p className="banner banner--error">Can’t reach the API: {error}</p>}
       {loading && rooms.length === 0 && <p className="banner">Loading…</p>}
+
+      {rooms.length > 0 && <OfficeMap rooms={rooms} />}
 
       {rooms.length > 0 && (
         <table className="rooms">
