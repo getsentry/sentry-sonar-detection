@@ -34,7 +34,7 @@ vent_n = 6;
 vent_end_margin = 9;   // keep slits clear of the short ends
 
 /* ---- Vent slits on the lid (two clusters flanking the radar window) ---- */
-lid_vent_w = 2.5;
+lid_vent_w = 1.0;
 lid_vent_len = 18;
 lid_vent_per_end = 3;
 lid_vent_gap = 5;
