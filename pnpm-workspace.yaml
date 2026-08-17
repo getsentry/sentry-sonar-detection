@@ -1,0 +1,4 @@
+# pnpm workspaces. Firmware (firmware/*) is PlatformIO, not npm — excluded here.
+packages:
+  - api
+  - dashboard

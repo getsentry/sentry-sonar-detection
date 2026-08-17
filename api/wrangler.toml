@@ -1,0 +1,23 @@
+name = "sentry-sonar-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+# v11 @sentry/cloudflare requires nodejs_compat (see PLAN.md → Observability)
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database.
+#   Create it once:  pnpm --filter api exec wrangler d1 create sentry_sonar
+#   then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "sentry_sonar"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+# Office egress IPs allowed to read dashboard routes (comma-separated CIDRs).
+# See PLAN.md → Authentication. Example: "203.0.113.0/29,2001:db8::/48"
+OFFICE_IP_RANGES = ""
+
+# Secrets (do NOT put here — set with `wrangler secret put <NAME>`):
+#   SENTRY_DSN         Sentry project DSN for the Worker
+#   DEVICE_TOKEN_SALT  (optional) salt for hashing device tokens

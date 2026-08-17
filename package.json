@@ -4,12 +4,18 @@
   "private": true,
   "description": "Meeting-room presence detection with radar sensors, Cloudflare Workers/D1, e-ink displays, and a dashboard",
   "license": "MIT",
-  "workspaces": [
-    "api",
-    "dashboard"
-  ],
   "scripts": {
-    "dev:api": "npm run dev --workspace api",
-    "dev:dashboard": "npm run dev --workspace dashboard"
+    "dev:api": "pnpm --filter api dev",
+    "dev:dashboard": "pnpm --filter dashboard dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "volta": {
+    "node": "26.7.0",
+    "pnpm": "10.34.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd"]
   }
 }

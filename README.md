@@ -31,13 +31,20 @@ dashboard/               Cloudflare Pages (Vite + React)
 
 ## Getting started
 
+Toolchain is pinned with [Volta](https://volta.sh/) (Node 26 + pnpm 10) and
+managed with [pnpm](https://pnpm.io/) workspaces.
+
 ```sh
-npm install
-npm run dev:api          # Cloudflare Worker (local)
-npm run dev:dashboard    # dashboard (local)
+# Volta manages pnpm behind a feature flag — enable it once in your shell:
+export VOLTA_FEATURE_PNPM=1        # add to ~/.zshrc to make it stick
+
+pnpm install
+pnpm dev:api            # Cloudflare Worker (local, http://localhost:8787)
+pnpm dev:dashboard      # dashboard (local, Vite dev server)
 ```
 
-Firmware is built and flashed with [PlatformIO](https://platformio.org/).
+Firmware lives in `firmware/` and is built/flashed with
+[PlatformIO](https://platformio.org/) (outside the pnpm workspace).
 
 ## Status
 

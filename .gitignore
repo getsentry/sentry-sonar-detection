@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.output/
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# PlatformIO (firmware)
+.pio/
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
