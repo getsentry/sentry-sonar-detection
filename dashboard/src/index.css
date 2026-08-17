@@ -28,6 +28,20 @@ body {
   opacity: 0.6;
 }
 
+.app__header a {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.app__header a:hover {
+  opacity: 1;
+}
+
+.app__header .badge {
+  margin-top: 0.6rem;
+}
+
 .rooms {
   width: 100%;
   border-collapse: collapse;
@@ -45,6 +59,16 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.6;
+}
+
+.rooms a {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.rooms a:hover {
+  text-decoration: underline;
 }
 
 .badge {
@@ -83,6 +107,74 @@ body {
 .banner--error {
   background: #fde2e1;
   color: #b42318;
+}
+
+/* Room stats page */
+.stats__window {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.chip {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chip--active {
+  background: rgba(128, 128, 128, 0.2);
+  font-weight: 600;
+}
+
+.stat__value {
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat__label {
+  opacity: 0.6;
+}
+
+.meter {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.2);
+  overflow: hidden;
+  margin: 1rem 0 1.75rem;
+}
+
+.meter__fill {
+  height: 100%;
+  background: #b42318;
+  transition: width 0.3s ease;
+}
+
+.kv {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.kv > div {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  padding-bottom: 0.4rem;
+}
+
+.kv dt {
+  opacity: 0.6;
+}
+
+.kv dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-color-scheme: dark) {

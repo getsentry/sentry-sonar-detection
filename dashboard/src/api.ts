@@ -15,8 +15,29 @@ export interface RoomsResponse {
   rooms: Room[]
 }
 
+export interface RoomStats {
+  room: string
+  hours: number
+  occupiedSeconds: number
+  totalSeconds: number
+  ratio: number
+}
+
 export async function fetchRooms(signal?: AbortSignal): Promise<RoomsResponse> {
   const res = await fetch(`${API_BASE}/rooms`, { signal })
   if (!res.ok) throw new Error(`API returned ${res.status}`)
   return (await res.json()) as RoomsResponse
+}
+
+export async function fetchRoomStats(
+  id: string,
+  hours: number,
+  signal?: AbortSignal,
+): Promise<RoomStats> {
+  const res = await fetch(
+    `${API_BASE}/rooms/${encodeURIComponent(id)}/stats?hours=${hours}`,
+    { signal },
+  )
+  if (!res.ok) throw new Error(`API returned ${res.status}`)
+  return (await res.json()) as RoomStats
 }
