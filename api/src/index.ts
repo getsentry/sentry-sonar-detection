@@ -1,6 +1,7 @@
+import * as Sentry from '@sentry/cloudflare'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import type { AppEnv } from './env'
+import type { AppEnv, Env } from './env'
 import { deviceAuth, officeOnly, tokenAllowsRoom } from './auth'
 import {
   applyHeartbeat,
@@ -86,7 +87,18 @@ app.get('/rooms/:id/stats', officeOnly, async (c) => {
   return c.json({ room: id, hours, ...stats, buckets })
 })
 
-// NOTE: Sentry (@sentry/cloudflare v11 alpha) wrapping is intentionally not wired
-// yet. Add it per PLAN.md → Observability, verifying the exact withSentry API
-// against the repo MIGRATION.md at implementation time (alpha is a moving target).
-export default app
+// Exported for tests, which drive the router directly via app.request().
+export { app }
+
+// Wrap the Worker with Sentry (@sentry/cloudflare v11). The DSN comes from the
+// SENTRY_DSN secret; with no DSN (e.g. local dev) Sentry is a no-op. D1 is
+// auto-instrumented via env.
+export default Sentry.withSentry<Env>(
+  (env) => ({
+    dsn: env.SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  }),
+  {
+    fetch: (request, env, ctx) => app.fetch(request, env, ctx),
+  } satisfies ExportedHandler<Env>,
+)

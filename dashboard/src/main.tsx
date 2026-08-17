@@ -1,17 +1,26 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
+import * as Sentry from '@sentry/react'
 import App from './App'
+import { SENTRY_DSN } from './config'
 import './index.css'
 
-// NOTE: Sentry (@sentry/react v11 alpha) init is intentionally not wired yet.
-// Add Sentry.init(...) here per PLAN.md → Observability, verifying the exact
-// options against the repo MIGRATION.md at implementation time.
+// Sentry (@sentry/react v11). The DSN is public (client-side); empty = disabled.
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    integrations: [Sentry.browserTracingIntegration()],
+    tracesSampleRate: 1.0,
+  })
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <Sentry.ErrorBoundary fallback={<p style={{ padding: '2rem' }}>Something went wrong.</p>}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )
