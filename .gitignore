@@ -18,6 +18,10 @@ build/
 # PlatformIO (firmware)
 .pio/
 
+# Firmware: per-flash generated config (holds the device token) + local WiFi creds
+firmware/**/config.gen.h
+firmware/**/sensor.env
+
 # Logs
 *.log
 pnpm-debug.log*

@@ -282,6 +282,23 @@ so we deliberately skip the UART path (distance, moving/stationary targets,
 sensitivity config): no radar library, no extra wiring beyond `VCC` / `GND` /
 `OUT`.
 
+## Sensor networking (WiFi)
+
+The ESP32-S3 radio is **2.4 GHz only** — there is no 5 GHz support and no
+software upgrade for it (only the separate ESP32-C5 chip is dual-band). This
+constrains which network the sensors can join:
+
+- The office **`Sentry-Guest` SSID is 5 GHz-only**, so the sensors **cannot use
+  it**. Nearby 2.4 GHz coverage is also weak (~−88 dBm at the test spot).
+- **Testing:** a mobile hotspot (`FN-Hotspot`) with 2.4 GHz forced on.
+- **Production:** the rooms need a **2.4 GHz PSK SSID** — ideally a dedicated
+  IoT/guest network **without a captive portal** (ask IT), or a local 2.4 GHz AP
+  per floor. WPA2 or WPA2/WPA3-mixed; WPA3-Personal also works on the S3, so the
+  band — not the security type — is the only hard requirement.
+
+The SSID is set per-flash via `flash-sensor.sh --ssid`; the **WiFi password is
+entered at flash time and never stored** (no file/env fallback).
+
 ## Repository layout
 
 ```
@@ -329,7 +346,9 @@ against a real, working API.
 
 ## Open items
 
-- WiFi network + credentials strategy for provisioning 4 sensor + 4 display nodes.
+- Provision a **2.4 GHz PSK SSID** (no captive portal) for the sensors in the
+  real rooms — `Sentry-Guest` is 5 GHz-only and the ESP32-S3 is 2.4 GHz-only.
+  Plus the WiFi credentials strategy for the 4 sensor + 4 display nodes.
 - Collect the office **static egress IPs** (all sites/WAN links + IPv6) for the
   CIDR allowlist; confirm they're truly static.
 - Physical mounting of sensor node + display at each door.

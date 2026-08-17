@@ -53,7 +53,32 @@ toward the room.
 - The two little buttons near the jacks are **BOOT** (=IO0) and **EN/RST** — not
   port labels.
 
-## Build, flash, monitor
+## Flashing a sensor
+
+`main.cpp` is the production firmware: read the LD2410C OUT pin → `POST /events`.
+Each sensor needs a **unique room id + auth token**; the SSID defaults to
+`Sentry-Guest` and you enter the WiFi password at flash time.
+
+1. Mint a **write** token for the room and register it in the remote D1
+   (see [../../api/README.md](../../api/README.md#manage-device-tokens)):
+
+   ```sh
+   node ../../api/scripts/mint-token.mjs urwald write
+   ```
+
+2. Flash the board with that room + token (you'll be prompted for the WiFi
+   password), from `firmware/sensor-node/`:
+
+   ```sh
+   ./flash-sensor.sh --room urwald --token 'ss_xxxx.secret' --monitor
+   # options: --wifi-pass <pass>  --ssid <name>  --port /dev/cu.usbmodemXXXX
+   ```
+
+The script writes `src/config.gen.h` (gitignored — it holds the token),
+compiles, and uploads. Repeat per sensor with its own room + token. Nothing
+secret is committed.
+
+## Build, flash, monitor (manual / low-level)
 
 From the node's directory (e.g. `firmware/sensor-node/`):
 
@@ -86,29 +111,27 @@ release **BOOT** to force the bootloader, then re-run.
 > Do **not** use `stty … ; cat /dev/cu.…` — `cat` re-opens the port, macOS
 > resets it to 9600, and you get consistent garbage bytes (a wrong-baud read).
 
-## Testing the sensor node
+## Verifying a flashed sensor
 
-`sensor-node/src/main.cpp` is currently a **wiring test**: it only reads the
-radar's OUT pin and prints presence — no WiFi, no HTTP. Use it to prove the
-hardware before adding the network layer.
-
-1. Flash it and open the monitor (see above). Expected on boot:
+Open the monitor (`--monitor`, or `pio device monitor -b 115200`). Expected on
+boot:
 
    ```
-   === Sentry Sonar :: LD2410C OUT-pin test ===
-   Reading radar OUT on GPIO4
-   [status] occupied=0        ← heartbeat every 2s
+   === Sentry Sonar :: sensor-node ===
+   room=urwald  api=https://sentry-sonar-api.francesconovy.workers.dev  radar=GPIO4
+   [wifi] connecting to "Sentry-Guest" ...
+   [wifi] connected, ip=192.168.x.y
+   [http] POST /events occupied=0 -> 200
    ```
 
-2. Move in front of the radar → `[change] PRESENCE`, `occupied=1`. Step away →
-   `[change] clear`, `occupied=0` a few seconds later. (24GHz radar is
-   sensitive and reaches ~5m — to see it clear, you often have to leave the
-   room, not just lean back.)
+1. Move in front of the radar → `[http] POST /events occupied=1 -> 200`. Step
+   away → `occupied=0` a few seconds later (24GHz radar reaches ~5m — you often
+   have to leave the room, not just lean back). Cross-check with `GET /rooms`.
 
-3. **Prove the read path (rule out a stuck-HIGH pin):** pull the OUT jumper off
-   GPIO4 and touch it to a **GND** pin — `occupied` must go to `0` within ~2s.
-   Move it back to the radar's OUT and presence returns. Toggling both ways
-   confirms VCC/GND/OUT and the GPIO read are all correct.
+2. **Prove the read path (rule out a stuck-HIGH pin):** pull the OUT jumper off
+   GPIO4 and touch it to a **GND** pin — `occupied` must go to `0` within a
+   couple seconds. Move it back to the radar's OUT and presence returns.
+   Toggling both ways confirms VCC/GND/OUT and the GPIO read are all correct.
 
 ### Troubleshooting
 
@@ -119,3 +142,5 @@ hardware before adding the network layer.
 | Stuck `occupied=0` even in front | OUT not connected to GPIO4, or radar unpowered (VCC on 3V3 instead of 5V) |
 | No serial port in `pio device list` | Wrong USB-C jack, charge-only cable, or board not powered — try the other jack |
 | Flash hangs at `Connecting.....` | Hold **BOOT**, tap **EN/RST**, release **BOOT**, re-run |
+| `[http] … -> 401` or `403` | Token wrong/rotated, unregistered, or scoped to another room — re-mint (see api/README) |
+| `[http] … failed` or `[wifi] connect timed out` | Wrong WiFi password/SSID or out of range — reflash with the right `--wifi-pass` |
