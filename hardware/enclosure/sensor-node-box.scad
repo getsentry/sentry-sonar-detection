@@ -24,8 +24,8 @@ tol = 0.4;         // fit clearance for the lid lip
 
 /* ---- USB-C opening (on the +X short side) ---- */
 usb_w = 22;        // width  (Y) — room for two USB-C connectors side by side
-usb_h = 5;         // height (Z) — the "0.5 cm slit"
-usb_z0 = 4;        // gap bottom, above the inner floor
+usb_h = 7;         // height (Z) — the USB-C slit (~0.7 cm)
+usb_z0 = 0;        // flush with the inner floor (no gap)
 
 /* ---- Vent slits on the two long walls (+/-Y) ---- */
 vent_w = 2.5;
