@@ -1,5 +1,7 @@
 // Sentry Sonar — sensor-node enclosure
-// INTERNAL cavity 60 (L) x 30 (W) x 40 (H) mm. Body + drop-in lid.
+// INTERNAL cavity 60 (L) x 30 (W) x 40 (H) mm. Body + snap-fit lid
+// (rounded detents on the lip click into pockets in the body walls; a pry
+// notch in the rim pops it open by thumbnail).
 // Outer size is derived from the wall thickness (see below).
 // Vent slits on the long walls and the lid; a 5 mm-tall USB-C opening on one
 // short side. Print in PLA or PETG (radar-transparent) — never carbon-fibre /
@@ -39,6 +41,24 @@ lid_vent_len = 18;
 lid_vent_per_end = 3;
 lid_vent_gap = 5;
 
+/* ---- Snap-fit detents (lip beads <-> body wall pockets) + pry notch ---- */
+// Two rounded beads on each long lip face click into shallow pockets in the
+// body's inner walls. Interference at the pass point = detent_r - tol, so tune
+// the snap feel by nudging detent_r (0.7 @ tol 0.4 -> 0.3 mm = firm but openable;
+// drop to 0.6 if too stiff, raise to 0.8 if it pops loose). Positions are
+// symmetric in X and Y, so the lid latches whichever way it is flipped.
+detent_r     = 0.7;        // bead radius = protrusion from the lip face
+detent_len   = 6;         // bead length along the wall
+detent_below = 2.0;        // bead centre this far below the lid seam
+detent_xs    = [22, 42];   // X centres (symmetric about L/2); sit above the vent slits
+pocket_depth = 1.0;        // how deep the catch pocket bites into the 2 mm wall
+pocket_h     = 1.8;        // pocket height (bead dia 1.4 + clearance)
+pocket_over  = 1.0;        // pocket longer than the bead (total) for easy seating
+
+pry_notch    = true;       // scallop in the rim to lift the lid by thumbnail
+pry_notch_w  = 12;         // width along Y
+pry_notch_d  = 2.5;        // depth down from the rim
+
 /* ---- Radar window on the lid (thinned panel; radar antenna faces the lid) ---- */
 win_l = 26;        // window length (X)
 win_w = 22;        // window width  (Y)
@@ -63,6 +83,29 @@ module long_wall_vents() {
     }
 }
 
+// Catch pockets in the two long inner walls; the lid beads snap in below the
+// pocket's top edge (which forms the pull-out catch). zc matches the lid bead:
+//   body-frame z  = body_h - detent_below
+//   lid-frame z   = lid_t  + detent_below   (the lid prints flipped)
+// so assembled they meet at z = body_h + lid_t - detent_below.
+module detent_pockets() {
+    zc = body_h - detent_below;
+    plen = detent_len + pocket_over;
+    for (x = detent_xs) {
+        translate([x - plen / 2, wall - pocket_depth, zc - pocket_h / 2])
+            cube([plen, pocket_depth + 0.02, pocket_h]);              // -Y wall
+        translate([x - plen / 2, W - wall - 0.01, zc - pocket_h / 2])
+            cube([plen, pocket_depth + 0.02, pocket_h]);              // +Y wall
+    }
+}
+
+// Thumbnail scallop in the +X rim (opposite corner from any cabling), just
+// outboard of the lip, so a nail slips under the lid edge to pop it.
+module pry_cut() {
+    translate([L - wall - 0.5, (W - pry_notch_w) / 2, body_h - pry_notch_d])
+        cube([wall + 1, pry_notch_w, pry_notch_d + 1]);
+}
+
 module body() {
     difference() {
         cube([L, W, body_h]);
@@ -73,6 +116,8 @@ module body() {
         translate([L - wall - 1, (W - usb_w) / 2, floor_t + usb_z0])
             cube([wall + 2, usb_w, usb_h]);
         long_wall_vents();
+        detent_pockets();
+        if (pry_notch) pry_cut();
     }
 }
 
@@ -98,6 +143,19 @@ module radar_window() {
         cube([win_l, win_w, lid_t - window_t + 0.01]);
 }
 
+// Rounded snap beads on the two long lip faces. The lip outer face sits at
+// (wall + tol) from the box centre line, so each bead protrudes past the wall
+// inner face by (detent_r - tol) -> the interference that has to be pushed over.
+module detent_beads() {
+    zc = lid_t + detent_below;
+    yA = wall + tol;           // -Y lip face
+    yB = W - wall - tol;       // +Y lip face
+    for (x = detent_xs) {
+        translate([x - detent_len / 2, yA, zc]) rotate([0, 90, 0]) cylinder(h = detent_len, r = detent_r);
+        translate([x - detent_len / 2, yB, zc]) rotate([0, 90, 0]) cylinder(h = detent_len, r = detent_r);
+    }
+}
+
 module lid() {
     // Printed plate-down with the locating lip pointing UP; flip to assemble.
     lip_out_l = IL - 2 * tol;
@@ -113,6 +171,7 @@ module lid() {
                     translate([lip_wall, lip_wall, -1])
                         cube([lip_out_l - 2 * lip_wall, lip_out_w - 2 * lip_wall, lip_h + 2]);
                 }
+            detent_beads();
         }
         lid_vents();
         radar_window();
