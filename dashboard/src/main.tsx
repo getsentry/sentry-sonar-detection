@@ -12,6 +12,13 @@ if (SENTRY_DSN) {
     dsn: SENTRY_DSN,
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 1.0,
+    // Attach sentry-trace / baggage headers to these requests so the frontend
+    // trace connects to the API trace. The API allows these headers via CORS.
+    tracePropagationTargets: [
+      'localhost',
+      /^\//, // same-origin (dev proxy)
+      /^https:\/\/sentry-sonar-api\.francesconovy\.workers\.dev/,
+    ],
   })
 }
 

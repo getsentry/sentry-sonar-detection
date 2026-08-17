@@ -22,7 +22,8 @@ app.use(
   cors({
     origin: '*',
     allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Authorization', 'Content-Type'],
+    // sentry-trace + baggage let browser (frontend) traces connect to the API.
+    allowHeaders: ['Authorization', 'Content-Type', 'sentry-trace', 'baggage'],
   }),
 )
 
