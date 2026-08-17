@@ -5,6 +5,7 @@ import { deviceAuth, officeOnly, tokenAllowsRoom } from './auth'
 import {
   applyHeartbeat,
   getRoom,
+  hourlyUtilization,
   listRooms,
   nowSec,
   toRoomView,
@@ -79,8 +80,10 @@ app.get('/rooms/:id/stats', officeOnly, async (c) => {
 
   const hours = Math.min(720, Math.max(1, Math.floor(Number(c.req.query('hours')) || 24)))
   const now = nowSec()
-  const stats = await utilization(c.env.DB, id, now - hours * 3600, now)
-  return c.json({ room: id, hours, ...stats })
+  const since = now - hours * 3600
+  const stats = await utilization(c.env.DB, id, since, now)
+  const buckets = await hourlyUtilization(c.env.DB, id, since, now)
+  return c.json({ room: id, hours, ...stats, buckets })
 })
 
 // NOTE: Sentry (@sentry/cloudflare v11 alpha) wrapping is intentionally not wired

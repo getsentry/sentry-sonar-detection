@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { env } from 'cloudflare:test'
 import app from '../src/index'
+import { hourlyUtilization } from '../src/rooms'
 
 async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
@@ -48,9 +49,9 @@ describe('dashboard routes — office IP gate', () => {
     expect(body.rooms).toHaveLength(4)
     expect(body.rooms.map((r) => r.id).sort()).toEqual([
       'makava-kingdom',
+      'oida',
       'servus',
       'urwald',
-      'wednesday',
     ])
     expect(body.rooms.every((r) => r.status === 'offline')).toBe(true)
   })
@@ -156,11 +157,41 @@ describe('heartbeat flow', () => {
 })
 
 describe('stats', () => {
-  it('returns a utilization shape', async () => {
+  it('returns a utilization shape with hourly buckets', async () => {
     const res = await app.request('/rooms/urwald/stats', { headers: officeHeaders }, officeEnv())
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { room: string; hours: number; ratio: number }
+    const body = (await res.json()) as { room: string; hours: number; ratio: number; buckets: unknown[] }
     expect(body).toMatchObject({ room: 'urwald', hours: 24 })
     expect(typeof body.ratio).toBe('number')
+    expect(Array.isArray(body.buckets)).toBe(true)
+  })
+})
+
+describe('hourlyUtilization', () => {
+  it('attributes occupied time to the correct hour bucket', async () => {
+    const H = 1_800_000 // hour-aligned unix second
+    // occupied from H+600 to H+1200 (600s) within hour H
+    await env.DB.prepare('INSERT INTO events (room_id, occupied, created_at) VALUES (?, 1, ?)')
+      .bind('urwald', H + 600)
+      .run()
+    await env.DB.prepare('INSERT INTO events (room_id, occupied, created_at) VALUES (?, 0, ?)')
+      .bind('urwald', H + 1200)
+      .run()
+
+    const buckets = await hourlyUtilization(env.DB, 'urwald', H, H + 3600)
+    expect(buckets).toHaveLength(1)
+    expect(buckets[0]).toEqual({ start: H, occupiedSeconds: 600, totalSeconds: 3600 })
+  })
+
+  it('splits a segment across hour boundaries', async () => {
+    const H = 1_800_000
+    // occupied starting mid-first-hour, spanning into the next hour
+    await env.DB.prepare('INSERT INTO events (room_id, occupied, created_at) VALUES (?, 1, ?)')
+      .bind('servus', H + 3000)
+      .run()
+    const buckets = await hourlyUtilization(env.DB, 'servus', H, H + 7200)
+    expect(buckets).toHaveLength(2)
+    expect(buckets[0]).toMatchObject({ start: H, occupiedSeconds: 600 }) // H+3000..H+3600
+    expect(buckets[1]).toMatchObject({ start: H + 3600, occupiedSeconds: 3600 }) // full 2nd hour
   })
 })

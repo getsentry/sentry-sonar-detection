@@ -112,3 +112,68 @@ export async function utilization(
   const totalSeconds = Math.max(1, now - since)
   return { occupiedSeconds, totalSeconds, ratio: occupiedSeconds / totalSeconds }
 }
+
+export interface HourBucket {
+  start: number // unix seconds, start of the hour (UTC)
+  occupiedSeconds: number
+  totalSeconds: number
+}
+
+/**
+ * Per-hour occupied/observed seconds across [since, now], reconstructed from the
+ * events log. A segment that straddles an hour boundary is split across buckets.
+ * The client folds these into local hour-of-day bins for the busy-hours chart.
+ */
+export async function hourlyUtilization(
+  db: D1Database,
+  roomId: string,
+  since: number,
+  now: number,
+): Promise<HourBucket[]> {
+  const prior = await db
+    .prepare(
+      'SELECT occupied, created_at FROM events WHERE room_id = ? AND created_at <= ? ORDER BY created_at DESC LIMIT 1',
+    )
+    .bind(roomId, since)
+    .first<EventRow>()
+
+  const { results: within } = await db
+    .prepare(
+      'SELECT occupied, created_at FROM events WHERE room_id = ? AND created_at > ? ORDER BY created_at ASC',
+    )
+    .bind(roomId, since)
+    .all<EventRow>()
+
+  const HOUR = 3600
+  const buckets = new Map<number, { occ: number; total: number }>()
+  for (let h = Math.floor(since / HOUR) * HOUR; h < now; h += HOUR) {
+    buckets.set(h, { occ: 0, total: 0 })
+  }
+
+  const points = [
+    { t: since, occ: prior ? !!prior.occupied : false },
+    ...within.map((e) => ({ t: e.created_at, occ: !!e.occupied })),
+  ]
+
+  for (let i = 0; i < points.length; i++) {
+    const segStart = Math.max(points[i].t, since)
+    const segEnd = i + 1 < points.length ? points[i + 1].t : now
+    if (segEnd <= segStart) continue
+    const occ = points[i].occ
+    let t = segStart
+    while (t < segEnd) {
+      const hourStart = Math.floor(t / HOUR) * HOUR
+      const chunkEnd = Math.min(segEnd, hourStart + HOUR)
+      const bucket = buckets.get(hourStart)
+      if (bucket) {
+        bucket.total += chunkEnd - t
+        if (occ) bucket.occ += chunkEnd - t
+      }
+      t = chunkEnd
+    }
+  }
+
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([start, v]) => ({ start, occupiedSeconds: v.occ, totalSeconds: v.total }))
+}

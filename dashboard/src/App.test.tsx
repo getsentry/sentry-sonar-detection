@@ -55,6 +55,7 @@ describe('room stats', () => {
                 occupiedSeconds: 5400,
                 totalSeconds: 86400,
                 ratio: 0.0625,
+                buckets: [{ start: 1786885200, occupiedSeconds: 1800, totalSeconds: 3600 }],
               }),
             }
           : { ok: true, json: async () => roomsResponse },
@@ -64,5 +65,6 @@ describe('room stats', () => {
     await waitFor(() => expect(screen.getByText('6%')).toBeTruthy())
     expect(screen.getByRole('heading', { name: 'Urwald' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /all rooms/i })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /busy hours/i })).toBeTruthy()
   })
 })

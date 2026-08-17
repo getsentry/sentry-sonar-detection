@@ -15,12 +15,19 @@ export interface RoomsResponse {
   rooms: Room[]
 }
 
+export interface HourBucket {
+  start: number // unix seconds, start of the hour (UTC)
+  occupiedSeconds: number
+  totalSeconds: number
+}
+
 export interface RoomStats {
   room: string
   hours: number
   occupiedSeconds: number
   totalSeconds: number
   ratio: number
+  buckets: HourBucket[]
 }
 
 export async function fetchRooms(signal?: AbortSignal): Promise<RoomsResponse> {

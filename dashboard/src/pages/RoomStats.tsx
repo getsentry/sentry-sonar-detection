@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { fetchRooms, fetchRoomStats, type Room, type RoomStats } from '../api'
 import { StatusBadge, formatDuration, hoursLabel, relativeTime } from '../ui'
+import BusyHours from '../components/BusyHours'
 
 const POLL_MS = 10000
 const WINDOWS = [24, 168, 720] // 1d, 7d, 30d
@@ -102,6 +103,8 @@ export default function RoomStatsPage() {
               </div>
             )}
           </dl>
+
+          <BusyHours buckets={stats.buckets} />
         </section>
       )}
     </main>
