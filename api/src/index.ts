@@ -31,19 +31,12 @@ app.post('/events', deviceAuth('write'), async (c) => {
   if (!roomId) return c.json({ error: 'room_id_required' }, 400)
   if (typeof b.occupied !== 'boolean') return c.json({ error: 'occupied_must_be_boolean' }, 400)
 
-  let distanceCm: number | null = null
-  if (b.distance_cm != null) {
-    const d = Number(b.distance_cm)
-    if (!Number.isFinite(d)) return c.json({ error: 'invalid_distance_cm' }, 400)
-    distanceCm = d
-  }
-
   if (!tokenAllowsRoom(c.get('token'), roomId)) return c.json({ error: 'forbidden' }, 403)
 
   const room = await getRoom(c.env.DB, roomId)
   if (!room) return c.json({ error: 'unknown_room' }, 404)
 
-  const updated = await applyHeartbeat(c.env.DB, room, b.occupied, distanceCm)
+  const updated = await applyHeartbeat(c.env.DB, room, b.occupied)
   return c.json({ ok: true, room: toRoomView(updated, nowSec()) })
 })
 

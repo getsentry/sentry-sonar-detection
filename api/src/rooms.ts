@@ -41,7 +41,6 @@ export async function applyHeartbeat(
   db: D1Database,
   room: RoomRow,
   occupied: boolean,
-  distanceCm: number | null,
 ): Promise<RoomRow> {
   const now = nowSec()
   const changed = room.last_seen == null || !!room.occupied !== occupied
@@ -54,8 +53,8 @@ export async function applyHeartbeat(
   if (changed) {
     statements.push(
       db
-        .prepare('INSERT INTO events (room_id, occupied, distance_cm, created_at) VALUES (?, ?, ?, ?)')
-        .bind(room.id, occupied ? 1 : 0, distanceCm, now),
+        .prepare('INSERT INTO events (room_id, occupied, created_at) VALUES (?, ?, ?)')
+        .bind(room.id, occupied ? 1 : 0, now),
     )
   }
   await db.batch(statements)

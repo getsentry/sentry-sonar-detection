@@ -106,7 +106,7 @@ describe('heartbeat flow', () => {
       {
         method: 'POST',
         headers: jsonHeaders(token),
-        body: JSON.stringify({ room_id: 'urwald', occupied: true, distance_cm: 120 }),
+        body: JSON.stringify({ room_id: 'urwald', occupied: true }),
       },
       baseEnv(),
     )

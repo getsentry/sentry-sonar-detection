@@ -40,13 +40,12 @@ Body:
 | field | type | required | notes |
 |---|---|---|---|
 | `room_id` | string | yes | must match the token's room |
-| `occupied` | boolean | yes | radar presence |
-| `distance_cm` | number | no | nearest target distance (UART mode) |
+| `occupied` | boolean | yes | radar presence (LD2410C `OUT` pin) |
 
 ```console
 $ curl -X POST https://<worker>/events \
     -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-    -d '{"room_id":"urwald","occupied":true,"distance_cm":120}'
+    -d '{"room_id":"urwald","occupied":true}'
 {"ok":true,"room":{"id":"urwald","name":"Urwald","status":"in_use","occupied":true,"lastSeen":1786957010}}
 ```
 
