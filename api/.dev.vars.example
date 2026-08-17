@@ -1,2 +1,6 @@
 # Copy to `.dev.vars` for local `wrangler dev` (gitignored). Do not commit real values.
 SENTRY_DSN=""
+
+# Local dev only: bypass the office IP allowlist so dashboard routes work from
+# localhost. NEVER set this in production.
+ALLOW_INSECURE_LOCAL="true"

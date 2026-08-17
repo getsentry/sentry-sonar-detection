@@ -1,14 +1,16 @@
 import { Hono } from 'hono'
+import type { AppEnv } from './env'
+import { deviceAuth, officeOnly, tokenAllowsRoom } from './auth'
+import {
+  applyHeartbeat,
+  getRoom,
+  listRooms,
+  nowSec,
+  toRoomView,
+  utilization,
+} from './rooms'
 
-export interface Env {
-  DB: D1Database
-  /** Comma-separated CIDR allowlist for dashboard read routes (see PLAN.md). */
-  OFFICE_IP_RANGES: string
-  /** Sentry DSN (Worker secret). */
-  SENTRY_DSN?: string
-}
-
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<AppEnv>()
 
 // Health check.
 app.get('/', (c) => c.json({ service: 'sentry-sonar-api', ok: true }))
@@ -16,31 +18,64 @@ app.get('/', (c) => c.json({ service: 'sentry-sonar-api', ok: true }))
 // --- Device routes — per-room bearer token (see PLAN.md → Authentication) ---
 
 // Sensor heartbeat / state. Auth: WRITE scope, that room.
-app.post('/events', async (c) => {
-  // TODO(auth): verify per-room WRITE device token from `Authorization: Bearer`.
-  // TODO: upsert rooms state + append an events row on state change.
-  return c.json({ error: 'not_implemented' }, 501)
+app.post('/events', deviceAuth('write'), async (c) => {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400)
+  }
+
+  const b = body as Record<string, unknown>
+  const roomId = typeof b.room_id === 'string' ? b.room_id : null
+  if (!roomId) return c.json({ error: 'room_id_required' }, 400)
+  if (typeof b.occupied !== 'boolean') return c.json({ error: 'occupied_must_be_boolean' }, 400)
+
+  let distanceCm: number | null = null
+  if (b.distance_cm != null) {
+    const d = Number(b.distance_cm)
+    if (!Number.isFinite(d)) return c.json({ error: 'invalid_distance_cm' }, 400)
+    distanceCm = d
+  }
+
+  if (!tokenAllowsRoom(c.get('token'), roomId)) return c.json({ error: 'forbidden' }, 403)
+
+  const room = await getRoom(c.env.DB, roomId)
+  if (!room) return c.json({ error: 'unknown_room' }, 404)
+
+  const updated = await applyHeartbeat(c.env.DB, room, b.occupied, distanceCm)
+  return c.json({ ok: true, room: toRoomView(updated, nowSec()) })
 })
 
 // Single room status for the e-ink display. Auth: READ scope, that room.
-app.get('/rooms/:id', async (c) => {
-  // TODO(auth): verify per-room READ device token.
-  // TODO: return derived status (offline/unknown if last_seen older than ~90s).
-  return c.json({ error: 'not_implemented' }, 501)
+app.get('/rooms/:id', deviceAuth('read'), async (c) => {
+  const id = c.req.param('id')
+  if (!tokenAllowsRoom(c.get('token'), id)) return c.json({ error: 'forbidden' }, 403)
+
+  const room = await getRoom(c.env.DB, id)
+  if (!room) return c.json({ error: 'not_found' }, 404)
+  return c.json(toRoomView(room, nowSec()))
 })
 
 // --- Dashboard routes — office IP allowlist (see PLAN.md → Authentication) ---
 
 // All rooms + status for the overview dashboard.
-app.get('/rooms', async (c) => {
-  // TODO(auth): office IP allowlist via `CF-Connecting-IP` against OFFICE_IP_RANGES.
-  return c.json({ error: 'not_implemented' }, 501)
+app.get('/rooms', officeOnly, async (c) => {
+  const now = nowSec()
+  const rooms = await listRooms(c.env.DB)
+  return c.json({ now, rooms: rooms.map((r) => toRoomView(r, now)) })
 })
 
-// Utilization over time (later phase).
-app.get('/rooms/:id/stats', async (c) => {
-  // TODO(auth): office IP allowlist. TODO: aggregate from events.
-  return c.json({ error: 'not_implemented' }, 501)
+// Utilization over the last N hours (default 24, max 720).
+app.get('/rooms/:id/stats', officeOnly, async (c) => {
+  const id = c.req.param('id')
+  const room = await getRoom(c.env.DB, id)
+  if (!room) return c.json({ error: 'not_found' }, 404)
+
+  const hours = Math.min(720, Math.max(1, Math.floor(Number(c.req.query('hours')) || 24)))
+  const now = nowSec()
+  const stats = await utilization(c.env.DB, id, now - hours * 3600, now)
+  return c.json({ room: id, hours, ...stats })
 })
 
 // NOTE: Sentry (@sentry/cloudflare v11 alpha) wrapping is intentionally not wired

@@ -19,7 +19,7 @@ dashboard giving an overview of all rooms and how they're used.
 | Component | Role |
 |---|---|
 | Waveshare ESP32-S3 1.54" E-Paper (200×200, battery) | **Display node** — the sign on the door |
-| LD2410C 24GHz radar (FMCW, 5m, UART/GPIO) | **Presence sensor** |
+| LD2410C 24GHz radar (presence via GPIO `OUT` pin) | **Presence sensor** |
 | Freenove ESP32-S3 Lite | **Sensor node** MCU (hosts the radar) |
 | USB-C 25W charger | Mains power for the always-on sensor node |
 | Mini breadboard + M-F jumper wires | Wiring radar → ESP32 |
@@ -132,7 +132,6 @@ events (                          -- append-only history for analytics
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   room_id     TEXT,
   occupied    INTEGER,
-  distance_cm INTEGER,            -- optional, when using radar UART
   created_at  INTEGER
 )
 
@@ -277,13 +276,11 @@ list current.
 
 ## Radar integration
 
-The LD2410C offers two paths:
-
-- **GPIO `OUT` pin** — goes HIGH on presence. One `digitalRead()`. Use for v1.
-- **UART protocol** — moving vs. stationary target, distance, sensitivity config.
-  Richer analytics for v2 (e.g. `ncmreynolds/ld2410` Arduino library).
-
-Start with the OUT pin; upgrade to UART if time allows.
+The LD2410C's **GPIO `OUT` pin** goes HIGH on presence — a single `digitalRead()`
+is all the sensor node needs. The system only cares about **occupied true/false**,
+so we deliberately skip the UART path (distance, moving/stationary targets,
+sensitivity config): no radar library, no extra wiring beyond `VCC` / `GND` /
+`OUT`.
 
 ## Repository layout
 
@@ -319,7 +316,7 @@ against a real, working API.
 - Dashboard uses simple polling (not WebSocket push). ✅
 - Dashboard front-end: React + Vite (not plain HTML). ✅
 - Data store: D1 only (current state + event log). ✅
-- Radar via GPIO OUT pin first, UART later. ✅
+- Radar via GPIO OUT pin — occupied true/false only, no UART/distance. ✅
 - Sentry SDK on backend + frontend, **v11 alpha (`11.0.0-alpha.1`, `next` tag)**,
   set up per the repo's `MIGRATION.md` (not the stable v10 docs). ✅
 - **Free tier, no custom domain** — dashboard on `*.pages.dev`, API on
