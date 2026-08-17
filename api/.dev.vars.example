@@ -1,6 +1,11 @@
 # Copy to `.dev.vars` for local `wrangler dev` (gitignored). Do not commit real values.
 SENTRY_DSN=""
 
+# Office IP allowlist for dashboard routes (comma-separated CIDRs, IPv4 + IPv6).
+# Used when ALLOW_INSECURE_LOCAL is not set. In production this is a Worker
+# secret (`wrangler secret put OFFICE_IP_RANGES`), not committed anywhere.
+OFFICE_IP_RANGES=""
+
 # Local dev only: bypass the office IP allowlist so dashboard routes work from
-# localhost. NEVER set this in production.
+# localhost regardless of OFFICE_IP_RANGES. NEVER set this in production.
 ALLOW_INSECURE_LOCAL="true"

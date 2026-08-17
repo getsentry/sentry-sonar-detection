@@ -5,6 +5,8 @@ It ingests presence heartbeats from the sensor nodes and serves room status to
 the e-ink displays and the dashboard. See [`../PLAN.md`](../PLAN.md) for the
 overall design.
 
+**Deployed at:** <https://sentry-sonar-api.francesconovy.workers.dev>
+
 ## Endpoints
 
 | Method | Path | Caller | Auth |
@@ -24,7 +26,7 @@ A room's `status` is **derived**, not stored:
 ### `GET /` — health
 
 ```console
-$ curl https://<worker>/
+$ curl https://sentry-sonar-api.francesconovy.workers.dev/
 {"service":"sentry-sonar-api","ok":true}
 ```
 
@@ -43,7 +45,7 @@ Body:
 | `occupied` | boolean | yes | radar presence (LD2410C `OUT` pin) |
 
 ```console
-$ curl -X POST https://<worker>/events \
+$ curl -X POST https://sentry-sonar-api.francesconovy.workers.dev/events \
     -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
     -d '{"room_id":"urwald","occupied":true}'
 {"ok":true,"room":{"id":"urwald","name":"Urwald","status":"in_use","occupied":true,"lastSeen":1786957010}}
@@ -57,14 +59,14 @@ for that room, or a read-only token · `404` unknown room.
 Tiny payload for the e-ink display. Auth: a **read** (or write) token for that room.
 
 ```console
-$ curl https://<worker>/rooms/urwald -H "Authorization: Bearer $TOKEN"
+$ curl https://sentry-sonar-api.francesconovy.workers.dev/rooms/urwald -H "Authorization: Bearer $TOKEN"
 {"id":"urwald","name":"Urwald","status":"in_use","occupied":true,"lastSeen":1786957010}
 ```
 
 ### `GET /rooms` — all rooms (dashboard)
 
 ```console
-$ curl https://<worker>/rooms
+$ curl https://sentry-sonar-api.francesconovy.workers.dev/rooms
 {"now":1786957010,"rooms":[
   {"id":"makava-kingdom","name":"Makava Kingdom","status":"offline","occupied":false,"lastSeen":null},
   {"id":"servus","name":"Servus","status":"offline","occupied":false,"lastSeen":null},
@@ -79,7 +81,7 @@ Fraction of the window the room was occupied, reconstructed from the event log.
 Query: `hours` (default `24`, max `720`).
 
 ```console
-$ curl "https://<worker>/rooms/urwald/stats?hours=24"
+$ curl "https://sentry-sonar-api.francesconovy.workers.dev/rooms/urwald/stats?hours=24"
 {"room":"urwald","hours":24,"occupiedSeconds":5400,"totalSeconds":86400,"ratio":0.0625}
 ```
 
@@ -94,8 +96,10 @@ also satisfies `read`. Sent as `Authorization: Bearer <token>`.
 
 **Office IP allowlist (dashboard).** `GET /rooms` and `/rooms/:id/stats` are
 gated by `OFFICE_IP_RANGES` (comma-separated CIDRs, IPv4 + IPv6) matched against
-`CF-Connecting-IP`. Fails closed. For local dev, set `ALLOW_INSECURE_LOCAL=true`
-in `.dev.vars` to bypass the gate (never set it in production).
+`CF-Connecting-IP`. Fails closed. It's supplied as a **binding**, not committed:
+`.dev.vars` locally, a Worker **secret** (`wrangler secret put OFFICE_IP_RANGES`)
+in production. For local dev you can instead set `ALLOW_INSECURE_LOCAL=true` in
+`.dev.vars` to bypass the gate entirely (never set it in production).
 
 ## Local development
 
@@ -133,18 +137,80 @@ Tests run inside the Workers runtime with a real local D1
 pnpm --filter api test
 ```
 
-## Deploy
+## Deploy & operate
+
+`wrangler` below is the api workspace's binary — run each from the repo root as
+`pnpm --filter api exec wrangler …`, or drop the prefix from inside `api/`.
+`deploy` needs `pnpm … run deploy` (it's a reserved pnpm subcommand).
+
+### First-time deploy
 
 ```sh
-wrangler d1 create sentry_sonar          # paste the id into wrangler.toml
-pnpm --filter api db:migrate             # migrate the remote D1
-wrangler secret put SENTRY_DSN           # + any other secrets
-# set OFFICE_IP_RANGES (real office CIDRs) in wrangler.toml [vars]
-pnpm --filter api deploy
+wrangler login                                   # authenticate (opens a browser)
+wrangler d1 create sentry_sonar                  # → copy the printed database_id
+# paste that id into api/wrangler.toml:  database_id = "…"
+pnpm --filter api db:migrate                     # apply schema + seed to the remote D1
+pnpm --filter api run deploy                     # publish the Worker
+wrangler secret put OFFICE_IP_RANGES             # office CIDRs, e.g. 203.0.113.0/29
 ```
 
-Then mint production tokens with `node scripts/mint-token.mjs <room> <scope>`
-using the `--remote` INSERT.
+Deployed at <https://sentry-sonar-api.francesconovy.workers.dev>. First deploy on
+a fresh account prompts you to pick a free `workers.dev` subdomain.
+
+### Update the Worker (after code changes)
+
+```sh
+pnpm --filter api test && pnpm --filter api typecheck
+pnpm --filter api run deploy
+```
+
+### Change a secret / the office allowlist
+
+Secrets apply immediately (a new version, no redeploy). Re-run to change a value:
+
+```sh
+wrangler secret put OFFICE_IP_RANGES             # replace the office CIDRs
+wrangler secret list
+wrangler secret delete OFFICE_IP_RANGES
+```
+
+### Change the database schema
+
+Add a **new** migration (never edit an already-applied one), then apply it
+local → remote:
+
+```sh
+# create api/migrations/0003_<name>.sql
+pnpm --filter api db:migrate:local               # apply to the local dev DB
+pnpm --filter api db:migrate                     # apply to the remote DB
+```
+
+Ad-hoc SQL: `wrangler d1 execute sentry_sonar --remote --command "…"` (use
+`--local` for the dev DB).
+
+### Manage device tokens
+
+```sh
+# mint (prints the token once + an INSERT statement):
+node scripts/mint-token.mjs urwald write
+wrangler d1 execute sentry_sonar --remote --command "<the INSERT it printed>"
+
+# list:
+wrangler d1 execute sentry_sonar --remote \
+  --command "SELECT id, room_id, scope, label, revoked FROM api_tokens;"
+
+# revoke (takes effect immediately):
+wrangler d1 execute sentry_sonar --remote \
+  --command "UPDATE api_tokens SET revoked=1 WHERE id='ss_xxxx';"
+```
+
+### Logs & rollback
+
+```sh
+wrangler tail                                    # live request logs
+wrangler deployments list                        # deployment history
+wrangler rollback                                # revert to the previous version
+```
 
 ## Layout
 

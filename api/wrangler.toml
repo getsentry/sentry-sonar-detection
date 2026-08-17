@@ -10,13 +10,15 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "sentry_sonar"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "83ec8db8-33e9-4d79-b94b-7f8c17d3f541"
 migrations_dir = "migrations"
 
-[vars]
-# Office egress IPs allowed to read dashboard routes (comma-separated CIDRs).
-# See PLAN.md → Authentication. Example: "203.0.113.0/29,2001:db8::/48"
-OFFICE_IP_RANGES = ""
+# OFFICE_IP_RANGES (comma-separated CIDRs) gates the dashboard read routes.
+# Deliberately NOT committed here — provide it as a binding instead:
+#   local dev  → api/.dev.vars           e.g. OFFICE_IP_RANGES="203.0.113.0/29,2001:db8::/48"
+#   production → wrangler secret put OFFICE_IP_RANGES
+# The Worker reads c.env.OFFICE_IP_RANGES regardless of source.
+# (A secret of the same name overrides any [vars] value.)
 
 # Secrets (do NOT put here — set with `wrangler secret put <NAME>`):
 #   SENTRY_DSN         Sentry project DSN for the Worker

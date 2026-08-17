@@ -2,8 +2,12 @@ import type { TokenRow } from './types'
 
 export interface Env {
   DB: D1Database
-  /** Comma-separated CIDR allowlist for dashboard read routes (see PLAN.md). */
-  OFFICE_IP_RANGES: string
+  /**
+   * Comma-separated CIDR allowlist for dashboard read routes (see PLAN.md).
+   * Provided as a binding — `.dev.vars` locally, a Worker secret in production —
+   * so it is never committed. Absent → no IPs allowed (fails closed).
+   */
+  OFFICE_IP_RANGES?: string
   /** Sentry DSN (Worker secret). */
   SENTRY_DSN?: string
   /**
