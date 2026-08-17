@@ -43,14 +43,19 @@ export default function Overview() {
   return (
     <main className="app overview">
       <header className="app__header">
-        <h1>Sentry Sonar</h1>
-        <p className="app__subtitle">Meeting-room availability</p>
+        <img className="app__logo" src="/sentry-sonar.png" alt="Sentry Sonar" />
       </header>
 
       {error && <p className="banner banner--error">Can’t reach the API: {error}</p>}
       {loading && rooms.length === 0 && <p className="banner">Loading…</p>}
 
       {rooms.length > 0 && <OfficeMap rooms={rooms} />}
+
+      <p className="app__intro">
+          Sentry Sonar watches the office meeting rooms with presence detection
+          radar and reports, live, which rooms are occupied and which are free —
+          so you can find an open room at a glance instead of walking the floor.
+      </p>
 
       {rooms.length > 0 && (
         <table className="rooms">

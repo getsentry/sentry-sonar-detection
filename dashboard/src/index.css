@@ -2,6 +2,11 @@
   color-scheme: light dark;
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
+  font-size: 24px;
+
+  /* Brand purple, sampled from the Sentry Sonar logo (#783cb4). */
+  --brand: #783cb4;
+  --brand-hover: #5f2f90;
 }
 
 body {
@@ -15,12 +20,35 @@ body {
 }
 
 .app__header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .app__header h1 {
   margin: 0;
   font-size: 1.5rem;
+}
+
+.app__logo {
+  display: block;
+  height: 100px;
+  width: auto;
+  max-width: 100%;
+}
+
+.app__intro {
+  margin: 1rem 0;
+}
+
+/* The wordmark is dark navy on a transparent background, so it disappears on a
+   dark canvas. Sit the logo on a light chip in dark mode — keeps the purple/teal
+   rings on-brand while making the wordmark legible. */
+@media (prefers-color-scheme: dark) {
+  .app__logo {
+    box-sizing: content-box;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #f4f2fb;
+  }
 }
 
 .app__subtitle {
@@ -29,13 +57,13 @@ body {
 }
 
 .app__header a {
-  color: inherit;
+  color: var(--brand);
   text-decoration: none;
-  opacity: 0.75;
 }
 
 .app__header a:hover {
-  opacity: 1;
+  color: var(--brand-hover);
+  text-decoration: underline;
 }
 
 .app__header .badge {
@@ -62,7 +90,7 @@ body {
 }
 
 .rooms a {
-  color: inherit;
+  color: var(--brand);
   text-decoration: none;
   font-weight: 500;
 }
@@ -353,6 +381,11 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
+  :root {
+    /* Lighter tint so the brand purple stays legible on the dark canvas. */
+    --brand: #a877e6;
+    --brand-hover: #c3a6f0;
+  }
   .badge--in_use {
     background: #4c1d1a;
     color: #fca5a5;

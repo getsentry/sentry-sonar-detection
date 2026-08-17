@@ -22,10 +22,10 @@ const roomsResponse = {
 }
 
 describe('overview', () => {
-  it('renders the Sentry Sonar heading', () => {
+  it('renders the Sentry Sonar logo', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {}))) // pending
     renderAt('/')
-    expect(screen.getByRole('heading', { name: /sentry sonar/i })).toBeTruthy()
+    expect(screen.getByRole('img', { name: /sentry sonar/i })).toBeTruthy()
   })
 
   it('lists rooms and links each to its stats page', async () => {
