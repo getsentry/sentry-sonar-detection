@@ -27,10 +27,12 @@ export default function OfficeMap({ rooms }: { rooms: Room[] }) {
             to={`/rooms/${room.id}`}
             className={`marker marker--${room.status}`}
             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-            title={`${room.name ?? room.id} — ${STATUS_LABEL[room.status]}`}
             aria-label={`${room.name ?? room.id} — ${STATUS_LABEL[room.status]}`}
           >
             <span className="marker__dot" />
+            <span className="marker__tip">
+              {room.name ?? room.id} — {STATUS_LABEL[room.status]}
+            </span>
           </Link>
         )
       })}
