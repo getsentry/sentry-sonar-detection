@@ -101,10 +101,10 @@ npm install --workspace dashboard @sentry/react@next         # 11.0.0-alpha.1
 
 ### Backend — `@sentry/cloudflare` v11 setup notes
 
-- **`wrangler.toml` requires `nodejs_compat`** (v11 replaced `nodejs_als`):
+- **`wrangler.jsonc` requires `nodejs_compat`** (v11 replaced `nodejs_als`):
   ```diff
-  - compatibility_flags = ["nodejs_als"]
-  + compatibility_flags = ["nodejs_compat"]
+  - "compatibility_flags": ["nodejs_als"]
+  + "compatibility_flags": ["nodejs_compat"]
   ```
 - Wrap the Worker with `withSentry` (or use the Cloudflare Vite plugin, which
   **auto-instruments the Worker by default** in v11).

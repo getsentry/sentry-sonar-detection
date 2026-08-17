@@ -148,7 +148,7 @@ pnpm --filter api test
 ```sh
 wrangler login                                   # authenticate (opens a browser)
 wrangler d1 create sentry_sonar                  # → copy the printed database_id
-# paste that id into api/wrangler.toml:  database_id = "…"
+# paste that id into api/wrangler.jsonc:  "database_id": "…"
 pnpm --filter api db:migrate                     # apply schema + seed to the remote D1
 pnpm --filter api run deploy                     # publish the Worker
 wrangler secret put OFFICE_IP_RANGES             # office CIDRs, e.g. 203.0.113.0/29

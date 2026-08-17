@@ -11,7 +11,7 @@ export default defineConfig({
       const migrationsPath = fileURLToPath(new URL('./migrations', import.meta.url))
       const migrations = await readD1Migrations(migrationsPath)
       return {
-        wrangler: { configPath: './wrangler.toml' },
+        wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
           bindings: { TEST_MIGRATIONS: migrations },
         },

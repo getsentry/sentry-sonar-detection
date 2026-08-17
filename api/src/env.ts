@@ -12,7 +12,7 @@ export interface Env {
   SENTRY_DSN?: string
   /**
    * Local-dev only: when "true", bypass the office IP gate. Set in `.dev.vars`,
-   * NEVER in production `wrangler.toml` vars.
+   * NEVER in production `wrangler.jsonc` vars.
    */
   ALLOW_INSECURE_LOCAL?: string
 }
