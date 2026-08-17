@@ -5,9 +5,9 @@
 // Calibrated to vie-office-map.png (Sentry Vienna floor plan): OIDA / SERVUS /
 // URWALD stacked down the left edge, MAKAVA KINGDOM lower center-left.
 export const ROOM_POSITIONS: Record<string, { x: number; y: number }> = {
-  oida: { x: 7, y: 27 },
-  servus: { x: 7, y: 50 },
-  urwald: { x: 7, y: 62 },
+  oida: { x: 7.3, y: 31 },
+  servus: { x: 6.8, y: 50.5 },
+  urwald: { x: 6.2, y: 62 },
   'makava-kingdom': { x: 19.5, y: 75 },
 }
 

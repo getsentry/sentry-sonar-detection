@@ -203,8 +203,9 @@ body {
 }
 
 .marker__dot {
-  width: 18px;
-  height: 18px;
+  display: block;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
