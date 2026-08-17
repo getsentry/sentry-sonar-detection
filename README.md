@@ -66,13 +66,20 @@ pnpm typecheck
 
 ## Deploy
 
-The API runs on Cloudflare Workers + D1. First-time deploy, redeploys, schema
-migrations, secrets, and token management are documented in
-**[api/README.md → Deploy & operate](./api/README.md#deploy--operate)**.
-It's live at <https://sentry-sonar-api.francesconovy.workers.dev>.
-
-Firmware lives in `firmware/` and is built/flashed with
-[PlatformIO](https://platformio.org/) — see [firmware/README.md](./firmware/README.md).
+- **API** — Cloudflare Workers + D1, live at
+  <https://sentry-sonar-api.francesconovy.workers.dev>. First-time deploy,
+  redeploys, migrations, secrets, and tokens:
+  **[api/README.md → Deploy & operate](./api/README.md#deploy--operate)**.
+- **Dashboard** — Cloudflare Pages, live at <https://sentry-sonar.pages.dev>
+  (reads the API cross-origin; data only shows from an allowlisted office IP).
+  Rebuild + redeploy:
+  ```sh
+  pnpm --filter dashboard build
+  pnpm --filter api exec wrangler pages deploy ../dashboard/dist \
+    --project-name sentry-sonar --branch main
+  ```
+- **Firmware** — `firmware/`, built/flashed with
+  [PlatformIO](https://platformio.org/): see [firmware/README.md](./firmware/README.md).
 
 ## Status
 

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import type { AppEnv } from './env'
 import { deviceAuth, officeOnly, tokenAllowsRoom } from './auth'
 import {
@@ -11,6 +12,17 @@ import {
 } from './rooms'
 
 const app = new Hono<AppEnv>()
+
+// Allow the browser dashboard to read cross-origin. Read routes stay IP-gated —
+// CORS only lets the browser *read* the response; it is not an access control.
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Authorization', 'Content-Type'],
+  }),
+)
 
 // Health check.
 app.get('/', (c) => c.json({ service: 'sentry-sonar-api', ok: true }))
