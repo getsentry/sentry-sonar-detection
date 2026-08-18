@@ -79,7 +79,7 @@ $ curl https://sentry-sonar-api.francesconovy.workers.dev/rooms
   {"id":"makava-kingdom","name":"Makava Kingdom","status":"offline","occupied":false,"lastSeen":null},
   {"id":"servus","name":"Servus","status":"offline","occupied":false,"lastSeen":null},
   {"id":"urwald","name":"Urwald","status":"in_use","occupied":true,"lastSeen":1786957010},
-  {"id":"wednesday","name":"Wednesday","status":"offline","occupied":false,"lastSeen":null}
+  {"id":"oida","name":"Oida","status":"offline","occupied":false,"lastSeen":null}
 ]}
 ```
 
@@ -113,7 +113,7 @@ in production. For local dev you can instead set `ALLOW_INSECURE_LOCAL=true` in
 ## Local development
 
 ```sh
-export VOLTA_FEATURE_PNPM=1              # once per shell (see repo README)
+export VOLTA_FEATURE_PNPM=1              # once per shell (see SETUP.md)
 
 cp .dev.vars.example .dev.vars           # local secrets + ALLOW_INSECURE_LOCAL
 pnpm --filter api db:migrate:local       # create + migrate the local D1

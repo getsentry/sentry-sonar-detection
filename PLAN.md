@@ -2,7 +2,7 @@
 
 **Sentry Sonar** is a meeting-room occupancy system. Radar sensors detect human
 presence in each room and report to a Cloudflare Workers API. Two consumers read
-that data: e-ink displays on each room door showing **FREE / IN USE**, and a web
+that data: e-ink displays on each room door showing **FREE / OCCUPIED**, and a web
 dashboard giving an overview of all rooms and how they're used.
 
 - **Sentry** — stands watch over the room.
@@ -31,7 +31,7 @@ Two nodes per room — each does the job its power source suits:
 - **Sensor node** = Freenove ESP32-S3 + LD2410C radar, **mains-powered**.
   Always-on, senses continuously, POSTs presence heartbeats to the API.
 - **Display node** = Waveshare e-paper, **battery-powered**. Deep-sleeps and polls
-  the API only during **office hours** (weekdays 08:00–18:00 local, every 60s);
+  the API only during **office hours** (weekdays 08:00–18:00 Europe/Vienna, every 60s);
   nights and weekends the radio stays off. Redraws only when the state changes.
 
 Radar presence detection wants to be always on; e-ink wants to sleep and sip
@@ -100,10 +100,10 @@ v11 alpha is published under the **`next`** dist-tag (there is no `alpha` tag):
 
 ```sh
 # backend (Cloudflare Worker)
-npm install --workspace api @sentry/cloudflare@next          # 11.0.0-alpha.1
+pnpm --filter api add @sentry/cloudflare@next          # 11.0.0-alpha.1
 
 # frontend (React dashboard)
-npm install --workspace dashboard @sentry/react@next         # 11.0.0-alpha.1
+pnpm --filter dashboard add @sentry/react@next         # 11.0.0-alpha.1
 ```
 
 ### Backend — `@sentry/cloudflare` v11 setup notes
@@ -128,8 +128,8 @@ npm install --workspace dashboard @sentry/react@next         # 11.0.0-alpha.1
 
 ```sql
 rooms (
-  id          TEXT PRIMARY KEY,   -- e.g. "room-a"
-  name        TEXT,               -- "Room A"
+  id          TEXT PRIMARY KEY,   -- e.g. "urwald"
+  name        TEXT,               -- "Urwald"
   occupied    INTEGER,            -- 0 / 1
   last_seen   INTEGER,            -- unix seconds of last heartbeat
   updated_at  INTEGER
@@ -143,11 +143,11 @@ events (                          -- append-only history for analytics
 )
 
 api_tokens (                      -- device auth (see Authentication section)
-  id          TEXT PRIMARY KEY,   -- public token id / prefix, e.g. "ss_a1b2c3"
-  token_hash  TEXT NOT NULL,      -- SHA-256 of the secret; plaintext never stored
+  id          TEXT PRIMARY KEY,   -- public token id (part before the '.'), e.g. "ss_a1b2c3d4"
+  token_hash  TEXT NOT NULL,      -- SHA-256 of the secret half; plaintext never stored
   room_id     TEXT,               -- scoped room, or NULL/"*" for all-rooms
   scope       TEXT NOT NULL,      -- 'read' | 'write'
-  label       TEXT,               -- "room-a sensor", "room-a display"
+  label       TEXT,               -- "urwald sensor", "urwald display"
   revoked     INTEGER DEFAULT 0,
   created_at  INTEGER
 )
@@ -161,16 +161,17 @@ api_tokens (                      -- device auth (see Authentication section)
 - Derived status for consumers:
   - `last_seen` older than **~90s** → **`offline/unknown`** (a dead sensor must
     not show a stale "free").
-  - else `occupied` → **IN USE**, else **FREE**.
+  - else `occupied` → **OCCUPIED** (API status string `in_use`), else **FREE**.
 
 ## API surface
 
 | Method | Route | Caller | Auth | Purpose |
 |---|---|---|---|---|
+| `GET` | `/healthz` | anyone | none | health check (`/` serves the dashboard) |
 | `POST` | `/events` | sensor node | device token — **write**, that room | heartbeat / state |
 | `GET` | `/rooms/:id` | display node | device token — **read**, that room | one room's derived status |
 | `GET` | `/rooms` | dashboard | **office IP allowlist** (in Worker) | all rooms + status |
-| `GET` | `/rooms/:id/stats` | dashboard | **office IP allowlist** (in Worker) | utilization over time (later) |
+| `GET` | `/rooms/:id/stats` | dashboard | **office IP allowlist** (in Worker) | office-hours utilization over time |
 
 See the next section for how each auth type works.
 
@@ -181,8 +182,8 @@ Two callers with very different trust models, so two mechanisms:
 - **IoT devices** are headless and long-lived → **per-room, per-scope bearer
   tokens** we issue and store ourselves.
 - **The dashboard** is used by humans and must not be queryable by other
-  services/pages → **Cloudflare Access (Zero Trust SSO)**, no app-managed
-  passwords.
+  services/pages → an **office IP allowlist enforced in Worker code** (the default;
+  an optional Cloudflare Access SSO upgrade is described later in this section).
 
 ### Device tokens (sensor + display nodes)
 
@@ -190,18 +191,19 @@ Opaque random bearer tokens, each scoped to **one room** and **one action**:
 
 | Device | Scope | Room | Can do |
 |---|---|---|---|
-| Room A sensor | `write` | `room-a` | `POST /events` for room-a only |
-| Room A display | `read` | `room-a` | `GET /rooms/room-a` only |
+| urwald sensor | `write` | `urwald` | `POST /events` for urwald only |
+| urwald display | `read` | `urwald` | `GET /rooms/urwald` only |
 | …×4 rooms | | | 8 tokens total |
 
 **How it works:**
 
-1. Generate a random secret per device, e.g. `ss_room-a_<32 random bytes>`. The
-   `ss_room-a_` prefix is the public **id**; the rest is the secret.
-2. Store only the **SHA-256 hash** in `api_tokens` (plaintext never hits the DB).
-   Flash the full secret into each device's config (NVS / build-time define).
+1. Mint a token of the form `id.secret`: `id` is random (`ss_` + 8 hex chars, e.g.
+   `ss_a1b2c3d4`) and `secret` is ~24 random bytes (base64url). The `id` does **not**
+   encode the room — room scoping lives in the `room_id` column.
+2. Store only the **SHA-256 hash** of the secret in `api_tokens` (plaintext never
+   hits the DB). Flash the full `id.secret` into each device's config (build-time define).
 3. A Hono middleware on device routes: read `Authorization: Bearer <token>`,
-   split off the id, look up the row by id, `sha256(secret) === token_hash`,
+   split on the `.` to get the id, look up the row by id, `sha256(secret) === token_hash`,
    check `revoked = 0`, then enforce **scope** (read vs. write) and that
    `room_id` matches the `:id` / body room. Reject → `401`/`403`.
 
@@ -246,12 +248,13 @@ static egress IPs (multiple WAN links, NAT pools, sites), plus IPv6. Model the
 allowlist as a **list of CIDRs**, not a single address, in a Worker env var so
 adding a site is a one-line change:
 
-```
-OFFICE_IP_RANGES = [
-  "203.0.113.0/29",     # site A WAN pool (v4)
-  "198.51.100.42/32",   # site B static (v4)
-  "2001:db8:1234::/48", # office IPv6 range
-]
+The Worker reads it as a **comma-separated** string of CIDRs (IPv4 + IPv6), set as
+a secret — e.g. `203.0.113.0/29` (site A WAN pool), `198.51.100.42/32` (site B),
+`2001:db8:1234::/48` (office IPv6):
+
+```sh
+wrangler secret put OFFICE_IP_RANGES
+# value: 203.0.113.0/29,198.51.100.42/32,2001:db8:1234::/48
 ```
 
 **Optional upgrade — add remote SSO without a custom domain.** The dashboard is
@@ -341,31 +344,23 @@ against a real, working API.
 
 ## Confirmed decisions
 
-- Two nodes per room (not all-in-one). ✅
-- Display polls **office-hours only** (weekdays 08:00–18:00 local @ 60s; nights &
-  weekends the radio stays off), with wall-clock time taken from the API's `Date`
-  response header (no NTP). Expected **~9–10 days** on a 400 mAh cell; the
-  active-hours interval is the main lever (2 min → ~2.5 weeks). ✅
-- Display battery operation needs two board-specific fixes (Waveshare
-  ESP32-S3-ePaper-1.54): **`VBAT_PWR`/GPIO17 is the battery power latch** (assert
-  HIGH at boot, never LOW — driving it LOW is the board's shutdown), and it must be
-  **held through deep sleep** (`gpio_hold_en`). Both symptoms look fine on USB and
-  only bite on battery. See
+A short log of settled choices — the rationale for each is in the sections above.
+
+- Two nodes per room (sensor + display), not all-in-one. ✅
+- Display polls **office-hours only** (weekdays 08:00–18:00 Europe/Vienna @ 60s;
+  radio off nights/weekends); wall-clock from the API `Date` header, no NTP;
+  ~9–10 days per charge. ✅
+- Display battery needs two board fixes — `VBAT_PWR`/GPIO17 is the power latch (HIGH
+  at boot, never LOW), held through deep sleep. See
   [firmware/README.md](firmware/README.md#display-board--power-gotchas). ✅
-- Dashboard uses simple polling (not WebSocket push). ✅
-- Dashboard front-end: React + Vite (not plain HTML). ✅
-- Data store: D1 only (current state + event log). ✅
-- Radar via GPIO OUT pin — occupied true/false only, no UART/distance. ✅
-- Sentry SDK on backend + frontend, **v11 alpha (`11.0.0-alpha.1`, `next` tag)**,
-  set up per the repo's `MIGRATION.md` (not the stable v10 docs). ✅
-- **Free tier, no custom domain** — one Worker at `*.workers.dev` serves both the
-  API and the dashboard (Workers Static Assets), same origin. (Was API-Worker +
-  Cloudflare Pages; consolidated since Pages is in maintenance mode.) ✅
-- Auth: **per-room, per-scope device bearer tokens** (D1-backed) for IoT; for the
-  dashboard read routes, an **office IP allowlist enforced in Worker code** (WAF
-  isn't available on `workers.dev`). Allowlist modeled as a **list of CIDRs**
-  (multiple static office IPs + IPv6). In-office only by default; optional remote
-  SSO via Worker-level Access documented as an upgrade. ✅
+- Dashboard: React + Vite, simple polling (no WebSockets). ✅
+- Data store: **D1 only** (current state + event log). ✅
+- Radar via GPIO `OUT` pin — occupied true/false only, no UART/distance. ✅
+- Sentry SDK, **v11 alpha** (`next` tag), set up per the repo's `MIGRATION.md`. ✅
+- **One Worker** at `*.workers.dev` serves the API + dashboard (Static Assets), same
+  origin — free tier, no custom domain (was Worker + Pages; Pages is deprecated). ✅
+- Auth: per-room, per-scope **device bearer tokens** (D1) for IoT; **office IP
+  allowlist** (CIDR list) in Worker code for the dashboard routes. ✅
 
 ## Open items
 

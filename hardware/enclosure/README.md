@@ -8,6 +8,9 @@ through.
 
 ![preview](preview.png)
 
+> This is the **sensor-node** enclosure only. There is no display-node enclosure
+> yet — the Waveshare display is mounted as-is (see the repo TODO/PLAN).
+
 Everything is generated from one parametric source, `sensor-node-box.scad`.
 
 | File | What it is |

@@ -9,7 +9,9 @@ ESP32-S3 firmware for the two per-room nodes. Built and flashed with
   deep-sleeps and polls `GET /rooms/:id` every 30–60s, redraws on change.
 
 Each device is flashed with its own per-room bearer token and Wi-Fi credentials
-(see PLAN.md → Authentication).
+(see [../PLAN.md → Authentication](../PLAN.md#authentication--authorization)). The
+four rooms are `makava-kingdom`, `urwald`, `servus`, `oida` — use one of these as
+the `--room` id below (they're seeded into D1 by the API migrations).
 
 ## Prerequisites
 
@@ -59,11 +61,14 @@ toward the room.
 Each sensor needs a **unique room id + auth token**; the SSID defaults to
 `Sentry-Guest` and you enter the WiFi password at flash time.
 
-1. Mint a **write** token for the room and register it in the remote D1
-   (see [../../api/README.md](../../api/README.md#manage-device-tokens)):
+1. Mint a **write** token for the room and register it in the **remote
+   (production) D1** (see [../api/README.md](../api/README.md#manage-device-tokens)):
 
    ```sh
    node ../../api/scripts/mint-token.mjs urwald write
+   # It prints the token once, plus a `wrangler d1 execute … --local` line.
+   # Run that line but change --local to --remote, so the hash lands in the
+   # production DB the deployed Worker reads (otherwise the device gets 401).
    ```
 
 2. Flash the board with that room + token (you'll be prompted for the WiFi
@@ -71,6 +76,7 @@ Each sensor needs a **unique room id + auth token**; the SSID defaults to
 
    ```sh
    ./flash-sensor.sh --room urwald --token 'ss_xxxx.secret' --monitor
+   # --monitor opens the serial monitor after flashing so you can watch it boot.
    # options: --wifi-pass <pass>  --ssid <name>  --port /dev/cu.usbmodemXXXX
    ```
 
@@ -85,12 +91,12 @@ secret is committed.
 display needs a **read** token for its room (a display can only read; it never
 writes state).
 
-1. Mint a **read** token for the room and register it in the remote D1
-   (see [../api/README.md](../api/README.md#manage-device-tokens)):
+1. Mint a **read** token for the room and register it in the **remote
+   (production) D1** (see [../api/README.md](../api/README.md#manage-device-tokens)):
 
    ```sh
    node ../../api/scripts/mint-token.mjs makava-kingdom read
-   # then run the printed `wrangler d1 execute … --remote` line to register it
+   # run the printed `wrangler d1 execute` line, changing --local to --remote
    ```
 
 2. Flash the board with that room + token (you'll be prompted for the WiFi
@@ -103,6 +109,11 @@ writes state).
 
    `--ssid` defaults to `Sentry-Guest`; set a per-machine default in
    `display.env` (copy `display.env.example`). The WiFi password is never stored.
+
+Unlike the sensor's dual-jack Freenove, the display board has a **single
+native-USB Type-C** port. Find it the same way — `pio device list` — but it
+enumerates with **VID `303A:1001`** (Espressif), as `/dev/cu.usbmodem*`. Its two
+side buttons are **PWR** and **BOOT** (the one with the "sun" icon).
 
 > **Download mode is required to flash.** The production firmware deep-sleeps, so
 > the board's USB port vanishes between wakes and the flasher can't open it. Put it
