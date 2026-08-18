@@ -57,8 +57,8 @@ fallback for a single demo room. Firmware stays modular so it's a small change.)
                                                    ▲
                                                    │ GET /rooms
                                            ┌──────────────┐
-                                           │ Pages UI     │  overview dashboard
-                                           │ React + Vite │
+                                           │ Dashboard    │  overview (served by
+                                           │ React + Vite │  the same Worker)
                                            └──────────────┘
 ```
 
@@ -212,16 +212,16 @@ this one action" is a two-field check.
 
 ### Dashboard auth — office IP allowlist (free tier, no custom domain)
 
-We're staying on **free Cloudflare hostnames** — dashboard on `*.pages.dev`, API
-on `*.workers.dev` — with **no custom domain**. That rules out some options and
-shapes the design:
+We're staying on a **free Cloudflare hostname** with **no custom domain** — one
+Worker at `*.workers.dev` serves both the dashboard and the API (same origin). That
+rules out some options and shapes the design:
 
 - **WAF custom rules are zone-only → not available on `workers.dev`.** So the IP
   gate can't be a firewall rule; it must be enforced **in Worker code**.
 - **Cloudflare Access _does_ now work on `workers.dev`** (Aug 2026 Worker-level
-  Access), but it's **all-or-nothing per Worker** and the cross-origin login
-  redirect breaks a `pages.dev` SPA calling a `workers.dev` API. So Access isn't
-  the clean default here — see the optional upgrade below.
+  Access), but it's **all-or-nothing per Worker**. Because the dashboard and API
+  are same-origin on one Worker, Access would be a clean fit for remote SSO — see
+  the optional upgrade below. For the hackweek we default to the IP allowlist.
 
 **Default (recommended for the hackweek): IP allowlist enforced in the Worker.**
 The dashboard is low-sensitivity, glanceable, and consumed **in the office**
@@ -254,14 +254,14 @@ OFFICE_IP_RANGES = [
 ]
 ```
 
-**Optional upgrade — add remote SSO without a custom domain.** If we later want
-to reach the dashboard from outside the office, the clean free-tier path is to
-serve the dashboard **same-origin from the Worker** (Workers Static Assets, so
-the SPA and its API share one `workers.dev` origin) and enable **Worker-level
-Cloudflare Access** on it, with an Access policy of **Bypass office IPs + Allow
-`@company.com`** → office is login-free, remote gets SSO. Because device routes
-can't do SSO and Access is per-Worker, keep **device ingestion on a separate
-Worker** (token auth in code, no Access). Validate identity via
+**Optional upgrade — add remote SSO without a custom domain.** The dashboard is
+already served **same-origin from the Worker** (Workers Static Assets), so the only
+remaining step for remote access is to enable **Worker-level Cloudflare Access**
+with a policy of **Bypass office IPs + Allow `@company.com`** → office is login-free,
+remote gets SSO. Catch: Access is **all-or-nothing per Worker**, and the device
+routes (token auth) can't do SSO — enabling Access on this Worker would lock the
+sensors/displays out. So first split **device ingestion onto a separate Worker**
+(no Access), then apply Access to the dashboard Worker. Validate identity via
 `ctx.access.getIdentity()`. More moving parts — only if remote access is needed.
 
 **Why not a shared read token in the frontend?** Anything shipped in browser JS
@@ -314,7 +314,7 @@ sentry-sonar/
 │  ├─ sensor-node/     # Freenove + LD2410C  (PlatformIO / Arduino)
 │  └─ display-node/    # Waveshare e-paper   (GxEPD2 + deep sleep)
 ├─ api/                # Cloudflare Worker (Hono) + D1 schema/migrations
-├─ dashboard/          # Cloudflare Pages (Vite + React)
+├─ dashboard/          # React SPA (Vite), served by the Worker
 └─ PLAN.md
 ```
 

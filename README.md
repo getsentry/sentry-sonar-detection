@@ -37,7 +37,7 @@ log **and** serves the dashboard (React SPA) as static assets — same origin, o
 firmware/sensor-node/    Freenove + LD2410C radar (PlatformIO)
 firmware/display-node/   Waveshare e-paper (GxEPD2 + deep sleep)
 api/                     Cloudflare Worker (Hono) + D1 migrations
-dashboard/               Cloudflare Pages (Vite + React)
+dashboard/               React SPA (Vite) — served by the Worker as static assets
 ```
 
 ## Docs
