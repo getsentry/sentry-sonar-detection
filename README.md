@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="dashboard/public/sentry-sonar.png" alt="Sentry Sonar" width="420">
+</p>
+
 # Sentry Sonar
 
 Real-time meeting-room availability, sensed by radar and shown right on the door.
