@@ -12,6 +12,13 @@ export default function Overview() {
   const [error, setError] = useState<{ message: string; notice: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Tick `now` up every second so "last seen" counts 1s, 2s, 3s… between polls
+  // (each poll re-syncs `now` to the server's authoritative time).
+  useEffect(() => {
+    const id = setInterval(() => setNow((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     let active = true
     const controller = new AbortController()

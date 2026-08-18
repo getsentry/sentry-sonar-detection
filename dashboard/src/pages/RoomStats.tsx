@@ -16,6 +16,12 @@ export default function RoomStatsPage() {
   const [error, setError] = useState<{ message: string; notice: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Tick `now` up every second so relative times count smoothly between polls.
+  useEffect(() => {
+    const id = setInterval(() => setNow((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     let active = true
     const controller = new AbortController()
