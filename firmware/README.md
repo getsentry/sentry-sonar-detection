@@ -104,11 +104,7 @@ writes state).
    `--ssid` defaults to `Sentry-Guest`; set a per-machine default in
    `display.env` (copy `display.env.example`). The WiFi password is never stored.
 
-**Serial + deep sleep.** This board has a single native-USB port, so `Serial`
-needs USB-CDC (already set in `platformio.ini`). Because the firmware deep-sleeps
-between polls, the USB serial disconnects each cycle and `pio device monitor`
-reconnects (or briefly errors) on every wake — expected; the per-wake log still
-prints on each boot.
+You have to make sure to move the display board into download mode - unplug it from USB, keep the "BOOT" button (sun icon) pressed, plug into USB, release BOOT button.
 
 ## Display power & polling strategy
 

@@ -29,7 +29,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <esp_sleep.h>
-#include <esp_system.h>
+#include <driver/gpio.h>  // gpio_hold_en/dis — keep VBAT latch high through deep sleep
 #include <time.h>
 #include <GxEPD2_BW.h>
 #include <Fonts/FreeSansBold18pt7b.h>
@@ -66,7 +66,9 @@ constexpr int PIN_EPD_MOSI = 13;
 constexpr int PIN_EPD_RST  = 9;
 constexpr int PIN_EPD_BUSY = 8;
 constexpr int PIN_EPD_PWR  = 6;   // active-LOW panel power gate
-constexpr int PIN_VBAT_PWR = 17;  // HIGH enables the battery voltage divider
+constexpr int PIN_VBAT_PWR = 17;  // BATTERY POWER LATCH: HIGH=battery on, LOW=power OFF.
+                                  // Assert HIGH at boot, NEVER drive LOW (that shuts the
+                                  // board off on battery — it's the demo's power-off cmd).
 constexpr int PIN_BAT_ADC  = 4;   // ADC1_CH3, reads Vbat/2
 
 constexpr int SCREEN_W = 200;
@@ -96,6 +98,22 @@ constexpr uint32_t NIGHT_CAP_SECONDS = 8 * 3600;  // 8h
 // Europe/Vienna, incl. EU DST rule (CET/CEST).
 static const char* TZ_VIENNA = "CET-1CEST,M3.5.0,M10.5.0/3";
 
+// ---- Debug mode ----------------------------------------------------------
+// 1 = bring-up/debugging: NO deep sleep (board stays awake so USB serial stays
+// 1 = debug: identical to production EXCEPT it polls every DEBUG_POLL_SECONDS
+//     (instead of POLL_SECONDS), redraws every poll, and stamps the poll time in
+//     the top-left corner — so you can watch it tick. Everything else (deep sleep,
+//     office-hours schedule, all screens) is the same as production.
+// 0 = production.
+#define DEBUG_MODE 0
+constexpr uint32_t DEBUG_POLL_SECONDS = 20;
+
+#if DEBUG_MODE
+#  define DEBUG_TAG "  [DEBUG]"
+#else
+#  define DEBUG_TAG ""
+#endif
+
 // What the panel is currently showing. Used both to pick a layout and as the
 // redraw dedup key (together with the battery bucket), so unchanged wakes draw
 // nothing at all.
@@ -119,15 +137,16 @@ constexpr uint32_t RTC_MAGIC = 0x50D1A202;  // bump on state/enum changes -> cle
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(
     GxEPD2_154_D67(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY));
 
+static time_t g_epoch = 0;  // last known epoch, for the debug clock stamp
+
 // ---- Battery -------------------------------------------------------------
+// VBAT_PWR (GPIO17) is the battery power latch — asserted HIGH once in setup()
+// and kept HIGH. It must NOT be toggled here: driving it LOW powers the board
+// off on battery (it's the demo's shutdown command). We only read the ADC.
 uint32_t readBatteryMv() {
-  pinMode(PIN_VBAT_PWR, OUTPUT);
-  digitalWrite(PIN_VBAT_PWR, HIGH);                // enable the divider path
   analogSetPinAttenuation(PIN_BAT_ADC, ADC_11db);  // ~0..3.3V range
-  delay(50);                                       // let the rail settle
   uint32_t acc = 0;
   for (int i = 0; i < 16; i++) acc += analogReadMilliVolts(PIN_BAT_ADC);
-  digitalWrite(PIN_VBAT_PWR, LOW);                 // stop drawing through it
   return (acc / 16) * 2;                           // undo the 1/2 divider
 }
 
@@ -360,36 +379,26 @@ void powerPanel(bool on) {
 }
 
 void render(Screen scr, int pct) {
-  static bool inited = false;
   powerPanel(true);
-  if (!inited) {
-    delay(100);
-    SPI.begin(PIN_EPD_SCK, /*MISO=*/-1, PIN_EPD_MOSI, PIN_EPD_CS);
-    display.init(115200);
-    display.setRotation(0);
-    display.setTextColor(GxEPD_BLACK);
-    inited = true;
-    display.setFullWindow();  // first draw must be full — establishes the base image
-  } else {
-    // Every update after: PARTIAL refresh — far lower current than a full refresh
-    // (the full-refresh booster spike is what browns out battery operation).
-    display.setPartialWindow(0, 0, SCREEN_W, SCREEN_H);
-  }
+  delay(100);
+  SPI.begin(PIN_EPD_SCK, /*MISO=*/-1, PIN_EPD_MOSI, PIN_EPD_CS);
+  display.init(115200);
+  display.setRotation(0);
+  display.setTextColor(GxEPD_BLACK);
+  display.setFullWindow();
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
 #if DEBUG_MODE
-    {  // debug: cycle counter + poll time, top-left corner
+    {  // debug: stamp the poll time top-left so you can watch it tick each poll
       struct tm lt;
       localtime_r(&g_epoch, &lt);
-      char line[32];
       char t[16];
       strftime(t, sizeof(t), "%H:%M:%S", &lt);
-      snprintf(line, sizeof(line), "#%lu %s", (unsigned long)g_cycle, t);
       display.setFont(NULL);
       display.setTextSize(1);
       display.setCursor(2, 2);
-      display.print(line);
+      display.print(t);
     }
 #endif
     if (scr == SCR_RECHARGE) {
@@ -420,37 +429,23 @@ void deepSleep(uint32_t seconds) {
   WiFi.mode(WIFI_OFF);
   Serial.printf("deep sleep %us\n", seconds);
   Serial.flush();
+  // Latch the battery-power pin (GPIO17) HIGH through deep sleep — otherwise the
+  // ESP32 floats its GPIOs while sleeping, the VBAT latch opens, and the board
+  // powers off on battery and never wakes.
+  gpio_hold_en((gpio_num_t)PIN_VBAT_PWR);
+  gpio_deep_sleep_hold_en();
   esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
   esp_deep_sleep_start();
 }
 
-void setup() {
-  setCpuFrequencyMhz(80);  // enough for WiFi, less power than 240
-  Serial.begin(115200);
-  delay(50);
-  setenv("TZ", TZ_VIENNA, 1);  // so localtime_r/mktime give DST-correct local time
-  tzset();
-
-  bool cold = (rtcMagic != RTC_MAGIC);
-  if (cold) {
-    rtcMagic = RTC_MAGIC;
-    rtcScreen = SCR_INVALID;
-    rtcBattBucket = -1;
-    rtcHaveAp = false;
-    rtcTimeValid = false;
-  }
-  Serial.printf("\n=== Sentry Sonar :: display-node === room=%s %s\n",
-                DISPLAY_ROOM_ID, cold ? "(cold boot)" : "(wake)");
-  if (strlen(DISPLAY_TOKEN) == 0)
-    Serial.println("[warn] no token — reflash with flash-display.sh");
-
+// One poll/draw cycle. Returns how many seconds to wait before the next one.
+uint32_t runCycle(bool cold) {
   uint32_t mv = readBatteryMv();
   int pct = batteryPercent(mv);
   int bucket = batteryBucket(pct);
   Serial.printf("battery: %u mV (~%d%%) bucket=%d\n", mv, pct, bucket);
 
-  // 1) Critical battery overrides everything: no radio, show RECHARGE, sleep.
-  //    (Checked every wake, incl. off-hours, so a dying board still warns.)
+  // 1) Critical battery overrides everything: no radio, show RECHARGE.
   if (pct < BATT_DEAD_PCT) {
     Serial.println("battery critical — skipping network");
     if (cold || rtcScreen != SCR_RECHARGE) {
@@ -458,7 +453,7 @@ void setup() {
       rtcScreen = SCR_RECHARGE;
       rtcBattBucket = (int8_t)bucket;
     }
-    deepSleep(CRITICAL_SLEEP);
+    return CRITICAL_SLEEP;
   }
 
   // 2) Are we inside active hours? Needs a clock estimate; if we have none yet
@@ -477,9 +472,7 @@ void setup() {
     Serial.println("no clock yet — polling to acquire time");
   }
 
-  // 3) Poll only when active (or still time-less). Outside office hours we skip
-  //    the radio entirely and show an OFF HOURS message instead of a stale
-  //    FREE/OCCUPIED.
+  // 3) Poll when active (or still time-less); else show OFF HOURS, radio off.
   Screen desired;
   if (activeNow || !haveTime) {
     bool gotTime = false;
@@ -489,8 +482,7 @@ void setup() {
       nowEpoch = netEpoch;
       haveTime = true;
       rtcTimeValid = true;
-      // We may have polled only to learn the time; if it's actually off-hours,
-      // show OFF HOURS rather than the room status we happened to read.
+      // Polled only to learn the time; if it's off-hours, show OFF HOURS.
       struct tm lt;
       localtime_r(&nowEpoch, &lt);
       if (!isActiveLocal(lt)) desired = SCR_OFFHOURS;
@@ -506,8 +498,14 @@ void setup() {
   WiFi.mode(WIFI_OFF);
   delay(50);  // let the rail settle after the radio drops
 
-  // 4) Redraw only when the frame actually changed.
-  if (cold || desired != rtcScreen || bucket != rtcBattBucket) {
+  g_epoch = nowEpoch;  // for the debug clock stamp
+
+  // 4) Redraw when the frame changed (or always, in debug).
+  bool forceDraw = false;
+#if DEBUG_MODE
+  forceDraw = true;
+#endif
+  if (cold || forceDraw || desired != rtcScreen || bucket != rtcBattBucket) {
     Serial.println("draw");
     render(desired, pct);
     rtcScreen = desired;
@@ -516,16 +514,21 @@ void setup() {
     Serial.println("skip (no redraw)");
   }
 
-  // 5) Sleep: POLL_SECONDS in active hours, else nap until the next active
-  //    window (capped by NIGHT_CAP_SECONDS so battery is still checked hourly).
-  uint32_t sleepS = POLL_SECONDS;
+  // 5) How long until the next poll: the active-hours interval, else nap until
+  //    the next active window (capped so battery is still checked periodically).
+#if DEBUG_MODE
+  const uint32_t pollInterval = DEBUG_POLL_SECONDS;
+#else
+  const uint32_t pollInterval = POLL_SECONDS;
+#endif
+  uint32_t sleepS = pollInterval;
   if (haveTime) {
     struct tm lt;
     localtime_r(&nowEpoch, &lt);
     if (!isActiveLocal(lt)) {
       time_t wake = nextActiveStart(nowEpoch);
       long secs = (long)(wake - nowEpoch);
-      if (secs < (long)POLL_SECONDS) secs = POLL_SECONDS;
+      if (secs < (long)pollInterval) secs = pollInterval;
       sleepS = (uint32_t)(secs < (long)NIGHT_CAP_SECONDS ? secs : NIGHT_CAP_SECONDS);
       struct tm wl;
       localtime_r(&wake, &wl);
@@ -537,9 +540,42 @@ void setup() {
 
   // Pre-advance the clock estimate to the next wake (re-anchored on next poll).
   if (haveTime) rtcEpoch = (int64_t)nowEpoch + (millis() / 1000) + sleepS;
-  deepSleep(sleepS);
+  return sleepS;
+}
+
+void setup() {
+  // FIRST THING: latch battery power on (GPIO17 HIGH). On this board VBAT_PWR
+  // gates the battery to the whole system, so assert it immediately — otherwise
+  // the board can't run on battery / dies the instant USB is unplugged. It is
+  // never driven LOW anywhere (LOW = power off).
+  pinMode(PIN_VBAT_PWR, OUTPUT);
+  digitalWrite(PIN_VBAT_PWR, HIGH);
+  gpio_hold_dis((gpio_num_t)PIN_VBAT_PWR);  // release the deep-sleep hold (no-op on cold
+                                            // boot); the driven HIGH above carries over
+                                            // seamlessly, so the latch never drops
+
+  setCpuFrequencyMhz(80);  // enough for WiFi, less power than 240
+  Serial.begin(115200);
+  delay(50);
+  setenv("TZ", TZ_VIENNA, 1);  // so localtime_r/mktime give DST-correct local time
+  tzset();
+
+  bool cold = (rtcMagic != RTC_MAGIC);
+  if (cold) {
+    rtcMagic = RTC_MAGIC;
+    rtcScreen = SCR_INVALID;
+    rtcBattBucket = -1;
+    rtcHaveAp = false;
+    rtcTimeValid = false;
+  }
+  Serial.printf("\n=== Sentry Sonar :: display-node === room=%s %s%s\n",
+                DISPLAY_ROOM_ID, cold ? "(cold boot)" : "(wake)", DEBUG_TAG);
+  if (strlen(DISPLAY_TOKEN) == 0)
+    Serial.println("[warn] no token — reflash with flash-display.sh");
+
+  deepSleep(runCycle(cold));  // one cycle, then deep sleep (which restarts setup)
 }
 
 void loop() {
-  // Never reached — setup() ends in deep sleep, which restarts at setup().
+  // Unused — setup() always ends in deep sleep, which restarts at setup().
 }
