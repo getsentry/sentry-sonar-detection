@@ -11,11 +11,17 @@ overall design.
 
 | Method | Path | Caller | Auth |
 |---|---|---|---|
-| `GET` | `/` | anyone | none (health check) |
+| `GET` | `/healthz` | anyone | none (health check) |
 | `POST` | `/events` | sensor node | device token — **write**, that room |
 | `GET` | `/rooms/:id` | display node | device token — **read**, that room |
 | `GET` | `/rooms` | dashboard | office IP allowlist |
 | `GET` | `/rooms/:id/stats` | dashboard | office IP allowlist |
+
+This same Worker also **serves the dashboard SPA** as static assets (Workers Static
+Assets): the API paths above are listed under `run_worker_first` in `wrangler.jsonc`
+so they always reach the Worker, and every other path (`/`, `/room-details/:id`,
+`/assets/*`, …) is served from the built dashboard, with an `index.html` SPA
+fallback. Same origin, so no CORS.
 
 A room's `status` is **derived**, not stored:
 
@@ -23,10 +29,12 @@ A room's `status` is **derived**, not stored:
 - `in_use` — a recent heartbeat with `occupied: true`.
 - `free` — a recent heartbeat with `occupied: false`.
 
-### `GET /` — health
+### `GET /healthz` — health
+
+(`/` serves the dashboard SPA, so the health check lives at `/healthz`.)
 
 ```console
-$ curl https://sentry-sonar-api.francesconovy.workers.dev/
+$ curl https://sentry-sonar-api.francesconovy.workers.dev/healthz
 {"service":"sentry-sonar-api","ok":true}
 ```
 
@@ -143,6 +151,10 @@ pnpm --filter api test
 `pnpm --filter api exec wrangler …`, or drop the prefix from inside `api/`.
 `deploy` needs `pnpm … run deploy` (it's a reserved pnpm subcommand).
 
+**The Worker also serves the dashboard** (`assets` in `wrangler.jsonc` →
+`../dashboard/dist`), so the SPA must be **built before deploying**. The easiest path
+is the root **`pnpm run deploy`**, which runs `dashboard build` then `api run deploy`.
+
 ### First-time deploy
 
 ```sh
@@ -150,7 +162,7 @@ wrangler login                                   # authenticate (opens a browser
 wrangler d1 create sentry_sonar                  # → copy the printed database_id
 # paste that id into api/wrangler.jsonc:  "database_id": "…"
 pnpm --filter api db:migrate                     # apply schema + seed to the remote D1
-pnpm --filter api run deploy                     # publish the Worker
+pnpm run deploy                                       # (from repo root) build dashboard + deploy Worker
 wrangler secret put OFFICE_IP_RANGES             # office CIDRs, e.g. 203.0.113.0/29
 ```
 
@@ -161,8 +173,11 @@ a fresh account prompts you to pick a free `workers.dev` subdomain.
 
 ```sh
 pnpm --filter api test && pnpm --filter api typecheck
-pnpm --filter api run deploy
+pnpm run deploy   # (from repo root) rebuilds the dashboard + redeploys the Worker
 ```
+
+(If you only changed the Worker and the dashboard `dist` is current, `pnpm --filter
+api run deploy` alone works too.)
 
 ### Change a secret / the office allowlist
 

@@ -29,8 +29,8 @@ const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 const jsonHeaders = (token: string) => ({ ...auth(token), 'content-type': 'application/json' })
 
 describe('health', () => {
-  it('GET / responds ok', async () => {
-    const res = await app.request('/', {}, baseEnv())
+  it('GET /healthz responds ok', async () => {
+    const res = await app.request('/healthz', {}, baseEnv())
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true })
   })

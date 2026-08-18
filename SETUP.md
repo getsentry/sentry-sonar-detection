@@ -13,8 +13,8 @@ this file is the ordered path through them.
 
 - **Node + pnpm** via [Volta](https://volta.sh/) (Node 26 + pnpm 10, pinned in
   `package.json`).
-- A **Cloudflare account** with Workers, D1, and Pages. `wrangler` ships with the
-  api workspace (run it as `pnpm --filter api exec wrangler …`).
+- A **Cloudflare account** with Workers + D1. `wrangler` ships with the api
+  workspace (run it as `pnpm --filter api exec wrangler …`).
 - **[PlatformIO CLI](https://platformio.org/)** (`pio`) for firmware.
 - **Hardware per room:** Freenove ESP32-S3 + LD2410C 24GHz radar (sensor node);
   Waveshare ESP32-S3-ePaper-1.54 (display node). Full list in
@@ -29,37 +29,37 @@ export VOLTA_FEATURE_PNPM=1               # add to ~/.zshrc to persist
 pnpm install                              # installs the api + dashboard workspaces
 ```
 
-## 2. Cloudflare backend (Worker + D1)
+## 2. Cloudflare — one Worker serves the API **and** the dashboard
 
-Details in [api/README.md → Deploy & operate](./api/README.md#deploy--operate).
+A single Worker runs the Hono API and serves the built dashboard SPA as static
+assets (same origin, one URL — no separate Pages project). Details in
+[api/README.md → Deploy & operate](./api/README.md#deploy--operate).
 
 ```sh
+# Set up D1 (from api/):
 cd api
 pnpm exec wrangler login                        # authenticate (opens a browser)
 pnpm exec wrangler d1 create sentry_sonar       # → copy the printed database_id
 # paste that id into api/wrangler.jsonc:  "database_id": "…"
 pnpm db:migrate                                 # schema + seeds the 4 rooms (remote D1)
-pnpm run deploy                                 # publish the Worker
+
+# Build the dashboard + deploy the Worker together (from the repo root):
+cd ..
+pnpm run deploy                                     # = dashboard build, then api deploy
+
+# Secrets (from api/):
+cd api
 pnpm exec wrangler secret put OFFICE_IP_RANGES  # office CIDRs, e.g. 203.0.113.0/29
 pnpm exec wrangler secret put SENTRY_DSN        # optional — error/trace monitoring
 ```
 
-The migration seeds the rooms, so there's no separate seed step. First deploy on a
-fresh account prompts for a free `workers.dev` subdomain — note the resulting API
-URL; you'll point the firmware and dashboard at it.
+`pnpm run deploy` (root) builds the dashboard into `dashboard/dist` and deploys the
+Worker, which bundles that as its static assets. The migration seeds the rooms (no
+separate seed step). First deploy on a fresh account prompts for a free
+`workers.dev` subdomain — the **API and dashboard share that one URL**; note it for
+the firmware config. The dashboard's data routes stay gated to `OFFICE_IP_RANGES`.
 
-## 3. Dashboard (Cloudflare Pages)
-
-```sh
-pnpm --filter dashboard build
-pnpm --filter api exec wrangler pages deploy ../dashboard/dist \
-  --project-name sentry-sonar --branch main
-```
-
-The dashboard reads the API cross-origin; room data only renders from an IP in
-`OFFICE_IP_RANGES` (set above).
-
-## 4. Device tokens
+## 3. Device tokens
 
 Every room needs **two** tokens: a **write** token for its sensor and a **read**
 token for its display. Mint each (prints the token once + an `INSERT`), then register
@@ -76,7 +76,7 @@ node scripts/mint-token.mjs <room-id> read      # display → save the token
 The plaintext token is shown **once** — save it, you'll flash it into the device
 next. Only its SHA-256 hash is stored, so a lost token means re-minting.
 
-## 5. Flash the firmware
+## 4. Flash the firmware
 
 Full wiring, download-mode, and power notes in
 [firmware/README.md](./firmware/README.md).
@@ -104,6 +104,11 @@ pnpm --filter api db:migrate:local        # create + migrate the local dev D1
 pnpm dev:api                              # Worker at http://localhost:8787
 pnpm dev:dashboard                        # Vite dev server (proxies /rooms, /events)
 ```
+
+Use the **Vite dev server** (`pnpm dev:dashboard`, with HMR) for frontend work — it
+proxies API calls to the local Worker. `pnpm dev:api` (`wrangler dev`) also serves
+`dashboard/dist` as assets, so if you want to exercise the single-Worker path
+locally, run `pnpm --filter dashboard build` first.
 
 ## Test & typecheck
 

@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/cloudflare'
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
 import type { AppEnv, Env } from './env'
 import { deviceAuth, officeOnly, tokenAllowsRoom } from './auth'
 import {
@@ -15,20 +14,14 @@ import {
 
 const app = new Hono<AppEnv>()
 
-// Allow the browser dashboard to read cross-origin. Read routes stay IP-gated —
-// CORS only lets the browser *read* the response; it is not an access control.
-app.use(
-  '*',
-  cors({
-    origin: '*',
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    // sentry-trace + baggage let browser (frontend) traces connect to the API.
-    allowHeaders: ['Authorization', 'Content-Type', 'sentry-trace', 'baggage'],
-  }),
-)
+// The dashboard SPA is served by this same Worker via Workers Static Assets
+// (same origin), so no CORS is needed. `/` serves the dashboard's index.html;
+// the health check lives at /healthz. The API paths below are marked
+// `run_worker_first` in wrangler.jsonc so they always reach the Worker; every
+// other path falls through to the static assets / SPA fallback.
 
 // Health check.
-app.get('/', (c) => c.json({ service: 'sentry-sonar-api', ok: true }))
+app.get('/healthz', (c) => c.json({ service: 'sentry-sonar-api', ok: true }))
 
 // --- Device routes — per-room bearer token (see PLAN.md → Authentication) ---
 

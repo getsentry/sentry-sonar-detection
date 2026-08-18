@@ -16,7 +16,18 @@
       "database_id": "83ec8db8-33e9-4d79-b94b-7f8c17d3f541",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+
+  // Serve the built dashboard SPA from this same Worker (Workers Static Assets),
+  // same origin as the API. `run_worker_first` sends the API paths to the Worker
+  // reliably (not via Sec-Fetch-Mode detection); everything else is a static asset,
+  // and unmatched client routes (e.g. /room-details/:id) fall back to index.html.
+  // Build the dashboard first: `pnpm --filter dashboard build`.
+  "assets": {
+    "directory": "../dashboard/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/events", "/rooms", "/rooms/*", "/healthz"]
+  }
 
   // OFFICE_IP_RANGES (comma-separated CIDRs) gates the dashboard read routes.
   // Deliberately NOT committed here — provide it as a binding instead:

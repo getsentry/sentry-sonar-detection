@@ -70,7 +70,7 @@ export default function Overview() {
             {rooms.map((room) => (
               <tr key={room.id}>
                 <td>
-                  <Link to={`/rooms/${room.id}`}>{room.name ?? room.id}</Link>
+                  <Link to={`/room-details/${room.id}`}>{room.name ?? room.id}</Link>
                 </td>
                 <td>
                   <StatusBadge status={room.status} />

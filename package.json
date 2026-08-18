@@ -17,7 +17,8 @@
     "dev:dashboard": "pnpm --filter dashboard dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "deploy": "pnpm --filter dashboard build && pnpm --filter api run deploy"
   },
   "packageManager": "pnpm@10.34.5",
   "volta": {

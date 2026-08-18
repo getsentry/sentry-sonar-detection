@@ -6,7 +6,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Overview />} />
-      <Route path="/rooms/:id" element={<RoomStatsPage />} />
+      <Route path="/room-details/:id" element={<RoomStatsPage />} />
     </Routes>
   )
 }

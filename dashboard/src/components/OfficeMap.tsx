@@ -24,7 +24,7 @@ export default function OfficeMap({ rooms }: { rooms: Room[] }) {
         return (
           <Link
             key={room.id}
-            to={`/rooms/${room.id}`}
+            to={`/room-details/${room.id}`}
             className={`marker marker--${room.status}`}
             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
             aria-label={`${room.name ?? room.id} — ${STATUS_LABEL[room.status]}`}

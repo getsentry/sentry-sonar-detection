@@ -23,13 +23,13 @@ design: radar only knows presence, not identity.
  Sensor node (Freenove ESP32 + LD2410C radar) ──POST /events──►  Cloudflare
                                                                   Worker (Hono)
  Display node (Waveshare e-paper)  ──GET /rooms/:id──►            + D1
- Dashboard (Pages, React)          ──GET /rooms─────►
+ Dashboard (React SPA)             ──GET /rooms─────►             + static assets
 ```
 
 Two nodes per room: a mains-powered **sensor node** that senses continuously, and a
-battery **display node** that deep-sleeps and polls during office hours. A Cloudflare
-Worker (Hono) on D1 holds current room state plus an append-only event log; the
-dashboard (Cloudflare Pages, React) reads the aggregate and the history.
+battery **display node** that deep-sleeps and polls during office hours. A single
+Cloudflare Worker (Hono) on D1 holds current room state plus an append-only event
+log **and** serves the dashboard (React SPA) as static assets — same origin, one URL.
 
 ## Repo layout
 
@@ -54,6 +54,6 @@ dashboard/               Cloudflare Pages (Vite + React)
 
 Hackweek project — 4 rooms, 4 device kits, all provisioned and running.
 
-- API: <https://sentry-sonar-api.francesconovy.workers.dev>
-- Dashboard: <https://sentry-sonar.pages.dev> (data shows only from an allowlisted
-  office IP)
+- App — dashboard + API on one Worker:
+  <https://sentry-sonar-api.francesconovy.workers.dev> (the dashboard is at the
+  root path; its data only loads from an allowlisted office IP)

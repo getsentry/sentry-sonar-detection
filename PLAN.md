@@ -64,18 +64,24 @@ fallback for a single demo room. Firmware stays modular so it's a small change.)
 
 ## Cloudflare stack
 
-- **Workers** — the API, using **Hono** (tiny router built for Workers).
+- **Workers** — the API **and** the dashboard, from **one** Worker. Hono routes
+  the API; the built **React + Vite** SPA is served as **Workers Static Assets**
+  (same origin). The dashboard uses **simple polling** (refresh `/rooms` every
+  5–10s). Plenty live enough for the demo; no WebSockets.
+  *(Originally two deploys — a Worker for the API + Cloudflare Pages for the
+  dashboard. Consolidated to one Worker + Static Assets: Pages is in maintenance
+  mode, and same-origin removes CORS and unlocks the optional Access-SSO upgrade
+  below. API paths are pinned with `run_worker_first`; the SPA's room-detail route
+  is `/room-details/:id` so it never collides with the device API's `/rooms/:id`.)*
 - **D1** (SQLite) — single data store. Holds current room state **and** an event
   log. The event log powers "how rooms are used" (utilization %, busy hours) on
   the dashboard, so we capture history from day one. No KV / Durable Objects
   needed for this scope.
-- **Pages** — the dashboard, a **React + Vite** app using **simple polling**
-  (refresh `/rooms` every 5–10s). Plenty live enough for the demo; no WebSockets.
 
-**Free tier, no custom domain.** Everything runs on the free Cloudflare
-hostnames: dashboard at `*.pages.dev`, API at `*.workers.dev`. This shapes the
-auth design (see Authentication) — notably, zone-level WAF rules aren't available
-on `workers.dev`, so gating is done in Worker code.
+**Free tier, no custom domain.** Everything runs on one free Cloudflare hostname:
+the Worker at `*.workers.dev` serves both the API and the dashboard. This shapes
+the auth design (see Authentication) — notably, zone-level WAF rules aren't
+available on `workers.dev`, so gating is done in Worker code.
 
 ## Observability — Sentry SDK (v11 alpha)
 
@@ -230,7 +236,7 @@ if (!inOfficeRanges(ip)) return c.json({ error: 'forbidden' }, 403)
 ```
 
 - No login, no custom domain, works 100% on free tier.
-- The `*.pages.dev` static shell can stay public — it's useless without data, and
+- The dashboard static shell can stay public — it's useless without data, and
   the data is gated at the Worker.
 - Trade-off: **no remote access** to the dashboard. For an in-office occupancy
   board that's acceptable (arguably a feature).
@@ -352,8 +358,9 @@ against a real, working API.
 - Radar via GPIO OUT pin — occupied true/false only, no UART/distance. ✅
 - Sentry SDK on backend + frontend, **v11 alpha (`11.0.0-alpha.1`, `next` tag)**,
   set up per the repo's `MIGRATION.md` (not the stable v10 docs). ✅
-- **Free tier, no custom domain** — dashboard on `*.pages.dev`, API on
-  `*.workers.dev`. ✅
+- **Free tier, no custom domain** — one Worker at `*.workers.dev` serves both the
+  API and the dashboard (Workers Static Assets), same origin. (Was API-Worker +
+  Cloudflare Pages; consolidated since Pages is in maintenance mode.) ✅
 - Auth: **per-room, per-scope device bearer tokens** (D1-backed) for IoT; for the
   dashboard read routes, an **office IP allowlist enforced in Worker code** (WAF
   isn't available on `workers.dev`). Allowlist modeled as a **list of CIDRs**

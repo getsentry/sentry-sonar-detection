@@ -36,7 +36,7 @@ describe('overview', () => {
     const table = screen.getByRole('table')
     expect(within(table).getByText('In use')).toBeTruthy()
     expect(within(table).getByRole('link', { name: 'Urwald' }).getAttribute('href')).toBe(
-      '/rooms/urwald',
+      '/room-details/urwald',
     )
   })
 })
@@ -61,7 +61,7 @@ describe('room stats', () => {
           : { ok: true, json: async () => roomsResponse },
       ),
     )
-    renderAt('/rooms/urwald')
+    renderAt('/room-details/urwald')
     await waitFor(() => expect(screen.getByText('6%')).toBeTruthy())
     expect(screen.getByRole('heading', { name: 'Urwald' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /all rooms/i })).toBeTruthy()
