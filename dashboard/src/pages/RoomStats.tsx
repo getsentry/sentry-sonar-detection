@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { fetchRooms, fetchRoomStats, type Room, type RoomStats } from '../api'
+import { fetchRooms, fetchRoomStats, describeError, type Room, type RoomStats } from '../api'
 import { StatusBadge, formatDuration, hoursLabel, relativeTime } from '../ui'
 import BusyHours from '../components/BusyHours'
 
@@ -13,7 +13,7 @@ export default function RoomStatsPage() {
   const [room, setRoom] = useState<Room | null>(null)
   const [stats, setStats] = useState<RoomStats | null>(null)
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; notice: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function RoomStatsPage() {
         setError(null)
       } catch (e) {
         if (!active || controller.signal.aborted) return
-        setError(e instanceof Error ? e.message : 'failed to load')
+        setError(describeError(e))
       } finally {
         if (active) setLoading(false)
       }
@@ -61,7 +61,11 @@ export default function RoomStatsPage() {
         {room && <StatusBadge status={room.status} />}
       </header>
 
-      {error && <p className="banner banner--error">Can’t reach the API: {error}</p>}
+      {error && (
+        <p className={`banner ${error.notice ? 'banner--notice' : 'banner--error'}`}>
+          {error.message}
+        </p>
+      )}
       {loading && !stats && <p className="banner">Loading…</p>}
 
       {stats && (

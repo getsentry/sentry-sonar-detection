@@ -137,6 +137,11 @@ body {
   color: #b42318;
 }
 
+.banner--notice {
+  background: #e7e0fb;
+  color: #4a2fa8;
+}
+
 /* Room stats page */
 .stats__window {
   display: flex;

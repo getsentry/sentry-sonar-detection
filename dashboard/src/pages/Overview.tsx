@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { fetchRooms, type Room } from '../api'
+import { fetchRooms, describeError, type Room } from '../api'
 import { StatusBadge, relativeTime } from '../ui'
 import OfficeMap from '../components/OfficeMap'
 
@@ -9,7 +9,7 @@ const POLL_MS = 5000
 export default function Overview() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; notice: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function Overview() {
         setError(null)
       } catch (e) {
         if (!active || controller.signal.aborted) return
-        setError(e instanceof Error ? e.message : 'failed to load')
+        setError(describeError(e))
       } finally {
         if (active) setLoading(false)
       }
@@ -46,7 +46,11 @@ export default function Overview() {
         <img className="app__logo" src="/sentry-sonar.png" alt="Sentry Sonar" />
       </header>
 
-      {error && <p className="banner banner--error">Can’t reach the API: {error}</p>}
+      {error && (
+        <p className={`banner ${error.notice ? 'banner--notice' : 'banner--error'}`}>
+          {error.message}
+        </p>
+      )}
       {loading && rooms.length === 0 && <p className="banner">Loading…</p>}
 
       {rooms.length > 0 && <OfficeMap rooms={rooms} />}
