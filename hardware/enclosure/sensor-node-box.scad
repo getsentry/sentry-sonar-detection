@@ -22,7 +22,7 @@ IH = 40;           // internal height (Z), floor to lid underside
 wall = 2;          // side wall thickness
 floor_t = 2;       // floor thickness
 lid_t = 2;         // lid plate thickness
-tol = 0.4;         // fit clearance for the lid lip
+tol = 0.3;         // fit clearance for the lid lip (tighter = less lateral wobble)
 
 /* ---- USB-C opening (on the +X short side) ---- */
 usb_w = 22;        // width  (Y) — room for two USB-C connectors side by side
@@ -44,15 +44,15 @@ lid_vent_gap = 5;
 /* ---- Snap-fit detents (lip beads <-> body wall pockets) + pry notch ---- */
 // Two rounded beads on each long lip face click into shallow pockets in the
 // body's inner walls. Interference at the pass point = detent_r - tol, so tune
-// the snap feel by nudging detent_r (0.7 @ tol 0.4 -> 0.3 mm = firm but openable;
-// drop to 0.6 if too stiff, raise to 0.8 if it pops loose). Positions are
+// the snap feel by nudging detent_r (0.8 @ tol 0.3 -> 0.5 mm = firm, pry-open;
+// drop to 0.7 if too stiff, raise to 0.9 if it still pops loose). Positions are
 // symmetric in X and Y, so the lid latches whichever way it is flipped.
-detent_r     = 0.7;        // bead radius = protrusion from the lip face
+detent_r     = 0.8;        // bead radius = protrusion from the lip face
 detent_len   = 6;         // bead length along the wall
 detent_below = 2.0;        // bead centre this far below the lid seam
 detent_xs    = [22, 42];   // X centres (symmetric about L/2); sit above the vent slits
 pocket_depth = 1.0;        // how deep the catch pocket bites into the 2 mm wall
-pocket_h     = 1.8;        // pocket height (bead dia 1.4 + clearance)
+pocket_h     = 2.0;        // pocket height (bead dia 1.6 + clearance)
 pocket_over  = 1.0;        // pocket longer than the bead (total) for easy seating
 
 pry_notch    = true;       // scallop in the rim to lift the lid by thumbnail
