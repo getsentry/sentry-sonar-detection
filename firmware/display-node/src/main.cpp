@@ -210,6 +210,7 @@ static bool waitForConnect() {
 bool connectWifi() {
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);  // lower TX peak -> gentler on a weak battery
   if (rtcHaveAp) {
     WiFi.begin(WIFI_SSID, WIFI_PASS, rtcChannel, rtcBssid);
     if (waitForConnect()) { cacheAp(); return true; }
@@ -359,16 +360,38 @@ void powerPanel(bool on) {
 }
 
 void render(Screen scr, int pct) {
+  static bool inited = false;
   powerPanel(true);
-  delay(100);
-  SPI.begin(PIN_EPD_SCK, /*MISO=*/-1, PIN_EPD_MOSI, PIN_EPD_CS);
-  display.init(115200);
-  display.setRotation(0);
-  display.setTextColor(GxEPD_BLACK);
-  display.setFullWindow();
+  if (!inited) {
+    delay(100);
+    SPI.begin(PIN_EPD_SCK, /*MISO=*/-1, PIN_EPD_MOSI, PIN_EPD_CS);
+    display.init(115200);
+    display.setRotation(0);
+    display.setTextColor(GxEPD_BLACK);
+    inited = true;
+    display.setFullWindow();  // first draw must be full — establishes the base image
+  } else {
+    // Every update after: PARTIAL refresh — far lower current than a full refresh
+    // (the full-refresh booster spike is what browns out battery operation).
+    display.setPartialWindow(0, 0, SCREEN_W, SCREEN_H);
+  }
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
+#if DEBUG_MODE
+    {  // debug: cycle counter + poll time, top-left corner
+      struct tm lt;
+      localtime_r(&g_epoch, &lt);
+      char line[32];
+      char t[16];
+      strftime(t, sizeof(t), "%H:%M:%S", &lt);
+      snprintf(line, sizeof(line), "#%lu %s", (unsigned long)g_cycle, t);
+      display.setFont(NULL);
+      display.setTextSize(1);
+      display.setCursor(2, 2);
+      display.print(line);
+    }
+#endif
     if (scr == SCR_RECHARGE) {
       // Dedicated dying-battery screen — no room status at all.
       drawBattery(/*x0=*/(SCREEN_W - 76 - 4) / 2, /*y0=*/26, /*w=*/76, /*h=*/36,
