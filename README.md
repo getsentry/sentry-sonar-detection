@@ -2,11 +2,20 @@
 
 Real-time meeting-room availability, sensed by radar and shown right on the door.
 
-A 24GHz radar sensor in each room detects human presence and reports to a
-Cloudflare Workers API. Two consumers read that data: e-ink displays on each door
-showing **FREE / OCCUPIED**, and a web dashboard with a live overview of all rooms
-and how they're used over time. No cameras, no microphones — radar senses *that*
-a person is present, never *who*.
+## What it does
+
+A 24GHz radar sensor in each room detects human presence — *that* a person is
+there, never *who* (no cameras, no microphones) — and reports to a Cloudflare
+Workers API. Two consumers read that data:
+
+- **E-ink door displays** show **FREE / OCCUPIED** at a glance. Battery-powered,
+  they deep-sleep and poll during office hours, running ~1–2 weeks per charge.
+- **A web dashboard** gives a live overview of every room, plus how they're used
+  over time (utilization, busy hours).
+
+**The outcome:** walk down the hall and see which rooms are free without opening a
+calendar or a booking app — and see room-usage trends on the dashboard. Privacy by
+design: radar only knows presence, not identity.
 
 ## Architecture
 
@@ -17,13 +26,12 @@ a person is present, never *who*.
  Dashboard (Pages, React)          ──GET /rooms─────►
 ```
 
-Two nodes per room: a mains-powered **sensor node** that senses continuously, and
-a battery **display node** that deep-sleeps and polls during office hours (weekdays
-08:00–18:00), running ~1–2 weeks per charge. See
-[firmware/README.md](./firmware/README.md#display-power--polling-strategy) for the
-power strategy and the board's battery gotchas.
+Two nodes per room: a mains-powered **sensor node** that senses continuously, and a
+battery **display node** that deep-sleeps and polls during office hours. A Cloudflare
+Worker (Hono) on D1 holds current room state plus an append-only event log; the
+dashboard (Cloudflare Pages, React) reads the aggregate and the history.
 
-## Layout
+## Repo layout
 
 ```
 firmware/sensor-node/    Freenove + LD2410C radar (PlatformIO)
@@ -32,61 +40,20 @@ api/                     Cloudflare Worker (Hono) + D1 migrations
 dashboard/               Cloudflare Pages (Vite + React)
 ```
 
-## Setup
+## Docs
 
-Toolchain is pinned with [Volta](https://volta.sh/) (Node 26 + pnpm 10) and
-managed with [pnpm](https://pnpm.io/) workspaces.
-
-```sh
-curl https://get.volta.sh | bash          # install Volta if you don't have it
-
-git clone <repo-url> && cd hackweek-2026
-
-# Volta manages pnpm behind a feature flag — enable it once in your shell:
-export VOLTA_FEATURE_PNPM=1               # add to ~/.zshrc to make it stick
-
-pnpm install                              # installs the api + dashboard workspaces
-```
-
-## Develop
-
-```sh
-# API — first run needs a local D1 (created + migrated on demand):
-cp api/.dev.vars.example api/.dev.vars
-pnpm --filter api db:migrate:local
-pnpm dev:api            # Cloudflare Worker at http://localhost:8787
-
-# Dashboard (proxies /rooms and /events to the local Worker):
-pnpm dev:dashboard      # Vite dev server
-```
-
-## Test & typecheck
-
-```sh
-pnpm test               # all workspaces
-pnpm typecheck
-```
-
-## Deploy
-
-- **API** — Cloudflare Workers + D1, live at
-  <https://sentry-sonar-api.francesconovy.workers.dev>. First-time deploy,
-  redeploys, migrations, secrets, and tokens:
-  **[api/README.md → Deploy & operate](./api/README.md#deploy--operate)**.
-- **Dashboard** — Cloudflare Pages, live at <https://sentry-sonar.pages.dev>
-  (reads the API cross-origin; data only shows from an allowlisted office IP).
-  Rebuild + redeploy:
-  ```sh
-  pnpm --filter dashboard build
-  pnpm --filter api exec wrangler pages deploy ../dashboard/dist \
-    --project-name sentry-sonar --branch main
-  ```
-- **Firmware** — `firmware/`, built/flashed with
-  [PlatformIO](https://platformio.org/): see [firmware/README.md](./firmware/README.md).
+- **[SETUP.md](./SETUP.md)** — step-by-step to stand up your own copy end to end
+  (Cloudflare backend, dashboard, device tokens, firmware).
+- **[PLAN.md](./PLAN.md)** — design, data model, API surface, and the decisions
+  behind them.
+- **[api/README.md](./api/README.md)** — API endpoints, deploy & operate, tokens.
+- **[firmware/README.md](./firmware/README.md)** — flashing sensors & displays,
+  board pinouts, and the battery/power gotchas.
 
 ## Status
 
-Hackweek project — 4 rooms, 4 device kits. See [PLAN.md](./PLAN.md) for the full
-plan, data model, API surface, and build phases.
+Hackweek project — 4 rooms, 4 device kits, all provisioned and running.
 
-API deployed at <https://sentry-sonar-api.francesconovy.workers.dev>.
+- API: <https://sentry-sonar-api.francesconovy.workers.dev>
+- Dashboard: <https://sentry-sonar.pages.dev> (data shows only from an allowlisted
+  office IP)
