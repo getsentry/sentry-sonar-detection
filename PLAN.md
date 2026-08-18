@@ -30,8 +30,9 @@ Two nodes per room — each does the job its power source suits:
 
 - **Sensor node** = Freenove ESP32-S3 + LD2410C radar, **mains-powered**.
   Always-on, senses continuously, POSTs presence heartbeats to the API.
-- **Display node** = Waveshare e-paper, **battery-powered**. Deep-sleeps, wakes
-  every 30–60s, polls the API, redraws only when the state changes.
+- **Display node** = Waveshare e-paper, **battery-powered**. Deep-sleeps and polls
+  the API only during **office hours** (weekdays 08:00–18:00 local, every 60s);
+  nights and weekends the radio stays off. Redraws only when the state changes.
 
 Radar presence detection wants to be always on; e-ink wants to sleep and sip
 power. Splitting the roles across two devices lets each do what it's good at,
@@ -318,8 +319,13 @@ sentry-sonar/
    can build against.
 2. **Sensor node.** Freenove + radar OUT pin → WiFi → POST heartbeats. Watch real
    state land in D1.
-3. **Display node.** Waveshare polls `/rooms/:id`, renders FREE / IN USE,
-   deep-sleeps between polls.
+3. **Display node.** Waveshare polls `/rooms/:id`, renders FREE / OCCUPIED,
+   deep-sleeps between polls. Polls **office-hours only** (weekdays 08:00–18:00
+   local @ 60s; nights & weekends the radio stays off and it shows an **OFF HOURS**
+   message instead of a stale status), taking wall-clock time from the API's `Date`
+   response header. Battery shown as a graphic (no number): `!` alert ≤10%,
+   full-screen **RECHARGE ME** <3%. See
+   [firmware/README.md](firmware/README.md#display-power--polling-strategy).
 4. **Dashboard.** React + Vite grid of 4 room cards, polling `/rooms`.
 5. **Polish.** Utilization stats, offline-detection UI, battery tuning, partial
    e-ink refresh, provisioning the 4 kits (room IDs, WiFi creds, tokens).
@@ -330,6 +336,10 @@ against a real, working API.
 ## Confirmed decisions
 
 - Two nodes per room (not all-in-one). ✅
+- Display polls **office-hours only** (weekdays 08:00–18:00 local @ 60s; nights &
+  weekends the radio stays off), with wall-clock time taken from the API's `Date`
+  response header (no NTP). Expected **~9–10 days** on a 400 mAh cell; the
+  active-hours interval is the main lever (2 min → ~2.5 weeks). ✅
 - Dashboard uses simple polling (not WebSocket push). ✅
 - Dashboard front-end: React + Vite (not plain HTML). ✅
 - Data store: D1 only (current state + event log). ✅

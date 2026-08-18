@@ -20,7 +20,7 @@ build/
 
 # Firmware: per-flash generated config (holds the device token) + local WiFi creds
 firmware/**/config.gen.h
-firmware/**/sensor.env
+firmware/**/*.env
 
 # Logs
 *.log

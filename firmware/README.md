@@ -78,6 +78,67 @@ The script writes `src/config.gen.h` (gitignored — it holds the token),
 compiles, and uploads. Repeat per sensor with its own room + token. Nothing
 secret is committed.
 
+## Flashing a display
+
+`display-node/src/main.cpp` is the production firmware: wake from deep sleep,
+`GET /rooms/:id`, redraw FREE / OCCUPIED only on change, sleep again. Each
+display needs a **read** token for its room (a display can only read; it never
+writes state).
+
+1. Mint a **read** token for the room and register it in the remote D1
+   (see [../api/README.md](../api/README.md#manage-device-tokens)):
+
+   ```sh
+   node ../../api/scripts/mint-token.mjs makava-kingdom read
+   # then run the printed `wrangler d1 execute … --remote` line to register it
+   ```
+
+2. Flash the board with that room + token (you'll be prompted for the WiFi
+   password), from `firmware/display-node/`:
+
+   ```sh
+   ./flash-display.sh --room makava-kingdom --token 'ss_xxxx.secret' --monitor
+   # options: --wifi-pass <pass>  --ssid <name>  --port /dev/cu.usbmodemXXXX
+   ```
+
+   `--ssid` defaults to `Sentry-Guest`; set a per-machine default in
+   `display.env` (copy `display.env.example`). The WiFi password is never stored.
+
+**Serial + deep sleep.** This board has a single native-USB port, so `Serial`
+needs USB-CDC (already set in `platformio.ini`). Because the firmware deep-sleeps
+between polls, the USB serial disconnects each cycle and `pio device monitor`
+reconnects (or briefly errors) on every wake — expected; the per-wake log still
+prints on each boot.
+
+## Display power & polling strategy
+
+The display runs on a small LiPo, so it does as little as possible. The Wi-Fi
+wake is essentially the *entire* energy budget, so everything is tuned to minimize
+how often the radio turns on.
+
+- **Deep sleep between polls.** Each cycle is a fresh boot: wake → read battery →
+  (in active hours) Wi-Fi + `GET /rooms/:id` → redraw **only if the frame
+  changed** → deep sleep (~10 µA; e-ink holds its image with no power).
+- **Office-hours only.** Polling runs **weekdays 08:00–18:00 local, every 60 s**.
+  Nights and weekends the radio never turns on — the board shows an **OFF HOURS**
+  message (not a stale FREE/OCCUPIED) and naps (waking at most every ~8 h just to
+  re-check the battery) until the next weekday morning. Nobody's in the rooms then,
+  so this roughly **triples** battery life.
+- **Time without NTP.** The schedule needs a wall clock, which the ESP32 loses in
+  deep sleep. Rather than an NTP round-trip, we read the `Date` header off every
+  API response (free), track it across sleeps with the wake timer, and re-anchor on
+  each daytime poll. Timezone/DST uses the Europe/Vienna POSIX rule.
+- **Battery graphic, not a number.** The corner shows a rough fill level (redrawn
+  only when the coarse level changes, not every poll); ≤10 % becomes a `!` alert;
+  <3 % replaces the room status with a full-screen **RECHARGE ME** (radio kept
+  off), so a dying panel never freezes on a misleading FREE/OCCUPIED.
+
+**Expected life ≈ 9–10 days** on the 400 mAh cell (bank on ~1 week to be safe).
+Weekday polling dominates, so the active-hours interval is the main lever: 2 min
+→ ~2.5 weeks, 5 min → ~5 weeks, trading sign responsiveness for runtime. Tunables
+are at the top of `src/main.cpp`: `POLL_SECONDS`, `ACTIVE_START_HOUR`,
+`ACTIVE_END_HOUR`, `SKIP_WEEKENDS`.
+
 ## Build, flash, monitor (manual / low-level)
 
 From the node's directory (e.g. `firmware/sensor-node/`):
