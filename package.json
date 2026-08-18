@@ -4,6 +4,14 @@
   "private": true,
   "description": "Meeting-room presence detection with radar sensors, Cloudflare Workers/D1, e-ink displays, and a dashboard",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getsentry/sentry-sonar-detection.git"
+  },
+  "homepage": "https://github.com/getsentry/sentry-sonar-detection#readme",
+  "bugs": {
+    "url": "https://github.com/getsentry/sentry-sonar-detection/issues"
+  },
   "scripts": {
     "dev:api": "pnpm --filter api dev",
     "dev:dashboard": "pnpm --filter dashboard dev",

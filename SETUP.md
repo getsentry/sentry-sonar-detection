@@ -24,7 +24,7 @@ this file is the ordered path through them.
 
 ```sh
 curl https://get.volta.sh | bash          # if you don't have Volta
-git clone <repo-url> && cd hackweek-2026
+git clone https://github.com/getsentry/sentry-sonar-detection.git && cd sentry-sonar-detection
 export VOLTA_FEATURE_PNPM=1               # add to ~/.zshrc to persist
 pnpm install                              # installs the api + dashboard workspaces
 ```
