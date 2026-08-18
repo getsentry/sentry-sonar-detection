@@ -90,7 +90,9 @@ export default function RoomStatsPage() {
 
           <div className="stat">
             <div className="stat__value">{pct}%</div>
-            <div className="stat__label">occupied over the last {hoursLabel(hours)}</div>
+            <div className="stat__label">
+              occupied during office hours · last {hoursLabel(hours)}
+            </div>
           </div>
 
           <div className="meter">
@@ -103,7 +105,7 @@ export default function RoomStatsPage() {
               <dd>{formatDuration(stats.occupiedSeconds)}</dd>
             </div>
             <div>
-              <dt>Window</dt>
+              <dt>Office hours</dt>
               <dd>{formatDuration(stats.totalSeconds)}</dd>
             </div>
             {room && (

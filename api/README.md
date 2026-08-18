@@ -85,8 +85,9 @@ $ curl https://sentry-sonar-api.francesconovy.workers.dev/rooms
 
 ### `GET /rooms/:id/stats` — utilization
 
-Fraction of the window the room was occupied, reconstructed from the event log.
-Query: `hours` (default `24`, max `720`).
+Fraction of **office hours** (Mon–Fri 08:00–18:00 Europe/Vienna) the room was
+occupied, reconstructed from the event log — nights and weekends are excluded from
+both `occupiedSeconds` and `totalSeconds`. Query: `hours` (default `24`, max `720`).
 
 ```console
 $ curl "https://sentry-sonar-api.francesconovy.workers.dev/rooms/urwald/stats?hours=24"

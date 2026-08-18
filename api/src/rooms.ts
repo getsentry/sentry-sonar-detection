@@ -73,9 +73,71 @@ interface EventRow {
   created_at: number
 }
 
+// --- Office hours -----------------------------------------------------------
+// Utilization only counts working hours: Mon–Fri 08:00–18:00 Europe/Vienna
+// (matches the display firmware's active window). Nights and weekends "don't
+// count" — excluded from both the occupied time and the total.
+const OFFICE_TZ = 'Europe/Vienna'
+const OFFICE_START_HOUR = 8
+const OFFICE_END_HOUR = 18
+
+// Timezone offset (seconds, local − UTC) at a given instant, via Intl.
+function tzOffsetSeconds(epochSec: number, tz: string): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+  const p = Object.fromEntries(
+    dtf.formatToParts(new Date(epochSec * 1000)).map((x) => [x.type, x.value]),
+  ) as Record<string, string>
+  const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) / 1000
+  return asUTC - epochSec
+}
+
+// Epoch (seconds) for a Vienna local wall-clock date + hour, DST-aware. (Office
+// boundaries 08:00/18:00 are never at a DST transition, so one correction is exact.)
+function zonedEpoch(y: number, m: number, d: number, hour: number): number {
+  const guess = Date.UTC(y, m - 1, d, hour, 0, 0) / 1000
+  return guess - tzOffsetSeconds(guess, OFFICE_TZ)
+}
+
+// Local calendar date + weekday (0=Sun..6=Sat) for an epoch, in OFFICE_TZ.
+function localParts(epochSec: number): { y: number; m: number; d: number; wday: number } {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: OFFICE_TZ,
+    weekday: 'short',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const p = Object.fromEntries(
+    dtf.formatToParts(new Date(epochSec * 1000)).map((x) => [x.type, x.value]),
+  ) as Record<string, string>
+  const wday = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[p.weekday] ?? 0
+  return { y: +p.year, m: +p.month, d: +p.day, wday }
+}
+
+/** Seconds within office hours (Mon–Fri 08:00–18:00 Europe/Vienna) in [start, end). */
+export function officeSecondsInInterval(start: number, end: number): number {
+  if (end <= start) return 0
+  let total = 0
+  let cursor = start
+  for (let guard = 0; guard < 400 && cursor < end; guard++) {
+    const { y, m, d, wday } = localParts(cursor)
+    if (wday >= 1 && wday <= 5) {
+      const lo = Math.max(start, zonedEpoch(y, m, d, OFFICE_START_HOUR))
+      const hi = Math.min(end, zonedEpoch(y, m, d, OFFICE_END_HOUR))
+      if (hi > lo) total += hi - lo
+    }
+    cursor = zonedEpoch(y, m, d + 1, 0) // next local midnight
+  }
+  return total
+}
+
 /**
- * Fraction of the window [since, now] during which the room was occupied,
- * reconstructed from the events log (state changes).
+ * Fraction of **office hours** in the window [since, now] during which the room
+ * was occupied, reconstructed from the events log (state changes). Time outside
+ * Mon–Fri 08:00–18:00 Europe/Vienna is excluded from both occupied and total.
  */
 export async function utilization(
   db: D1Database,
@@ -103,13 +165,14 @@ export async function utilization(
   let occupiedSeconds = 0
 
   for (const e of within) {
-    if (occupiedState) occupiedSeconds += e.created_at - cursor
+    if (occupiedState) occupiedSeconds += officeSecondsInInterval(cursor, e.created_at)
     cursor = e.created_at
     occupiedState = !!e.occupied
   }
-  if (occupiedState) occupiedSeconds += now - cursor
+  if (occupiedState) occupiedSeconds += officeSecondsInInterval(cursor, now)
 
-  const totalSeconds = Math.max(1, now - since)
+  // Total = office-hours seconds in the window (nights/weekends don't count).
+  const totalSeconds = Math.max(1, officeSecondsInInterval(since, now))
   return { occupiedSeconds, totalSeconds, ratio: occupiedSeconds / totalSeconds }
 }
 
