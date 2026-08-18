@@ -4,7 +4,7 @@ Real-time meeting-room availability, sensed by radar and shown right on the door
 
 A 24GHz radar sensor in each room detects human presence and reports to a
 Cloudflare Workers API. Two consumers read that data: e-ink displays on each door
-showing **FREE / IN USE**, and a web dashboard with a live overview of all rooms
+showing **FREE / OCCUPIED**, and a web dashboard with a live overview of all rooms
 and how they're used over time. No cameras, no microphones — radar senses *that*
 a person is present, never *who*.
 
@@ -18,7 +18,10 @@ a person is present, never *who*.
 ```
 
 Two nodes per room: a mains-powered **sensor node** that senses continuously, and
-a battery **display node** that deep-sleeps and polls every 30–60s.
+a battery **display node** that deep-sleeps and polls during office hours (weekdays
+08:00–18:00), running ~1–2 weeks per charge. See
+[firmware/README.md](./firmware/README.md#display-power--polling-strategy) for the
+power strategy and the board's battery gotchas.
 
 ## Layout
 

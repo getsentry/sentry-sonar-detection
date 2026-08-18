@@ -340,6 +340,12 @@ against a real, working API.
   weekends the radio stays off), with wall-clock time taken from the API's `Date`
   response header (no NTP). Expected **~9–10 days** on a 400 mAh cell; the
   active-hours interval is the main lever (2 min → ~2.5 weeks). ✅
+- Display battery operation needs two board-specific fixes (Waveshare
+  ESP32-S3-ePaper-1.54): **`VBAT_PWR`/GPIO17 is the battery power latch** (assert
+  HIGH at boot, never LOW — driving it LOW is the board's shutdown), and it must be
+  **held through deep sleep** (`gpio_hold_en`). Both symptoms look fine on USB and
+  only bite on battery. See
+  [firmware/README.md](firmware/README.md#display-board--power-gotchas). ✅
 - Dashboard uses simple polling (not WebSocket push). ✅
 - Dashboard front-end: React + Vite (not plain HTML). ✅
 - Data store: D1 only (current state + event log). ✅

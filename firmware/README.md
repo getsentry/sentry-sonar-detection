@@ -104,7 +104,12 @@ writes state).
    `--ssid` defaults to `Sentry-Guest`; set a per-machine default in
    `display.env` (copy `display.env.example`). The WiFi password is never stored.
 
-You have to make sure to move the display board into download mode - unplug it from USB, keep the "BOOT" button (sun icon) pressed, plug into USB, release BOOT button.
+> **Download mode is required to flash.** The production firmware deep-sleeps, so
+> the board's USB port vanishes between wakes and the flasher can't open it. Put it
+> in download mode first: unplug USB → hold **BOOT** (the "sun" side button) → plug
+> USB back in → release BOOT. Then pass `--port /dev/cu.usbmodemXXXX` explicitly so
+> auto-detect doesn't grab an unrelated serial device. See
+> [Display board & power gotchas](#display-board--power-gotchas) for the why.
 
 ## Display power & polling strategy
 
@@ -134,6 +139,42 @@ Weekday polling dominates, so the active-hours interval is the main lever: 2 min
 → ~2.5 weeks, 5 min → ~5 weeks, trading sign responsiveness for runtime. Tunables
 are at the top of `src/main.cpp`: `POLL_SECONDS`, `ACTIVE_START_HOUR`,
 `ACTIVE_END_HOUR`, `SKIP_WEEKENDS`.
+
+## Display board & power gotchas
+
+The display is a **Waveshare ESP32-S3-ePaper-1.54** (200×200 B/W, SSD1681 →
+`GxEPD2_154_D67`, with an on-board LiPo charger). Everything is wired internally, so
+the pin map is fixed and lives at the top of `src/main.cpp`:
+
+| Signal | GPIO | | Signal | GPIO |
+|---|---|---|---|---|
+| EPD CS / DC | 11 / 10 | | EPD SCK / MOSI | 12 / 13 |
+| EPD RST / BUSY | 9 / 8 | | EPD_PWR (panel, **active-LOW**) | 6 |
+| VBAT_PWR (battery latch) | 17 | | Battery ADC (ADC1_CH3, ÷2) | 4 |
+
+Three things about this board cost real debugging time — don't relearn them:
+
+- **`VBAT_PWR` (GPIO17) is the battery power latch for the *whole board*, not a
+  "measurement divider enable."** HIGH = battery powers the system; **LOW = power
+  off** (it's exactly what the vendor demo drives on a long-press-PWR shutdown). The
+  firmware asserts it HIGH once at the top of `setup()` and **never drives it LOW**.
+  Toggle it — e.g. to "save power while measuring the battery" — and the board dies
+  the instant USB is unplugged and browns out mid-refresh on battery, while looking
+  perfectly fine on USB (USB powers the board directly, bypassing the latch).
+- **Hold GPIO17 through deep sleep.** The ESP32 floats its GPIOs while asleep, so the
+  latch would open mid-sleep and the board would never wake on battery. Before
+  `esp_deep_sleep_start()` we call `gpio_hold_en(GPIO17)` + `gpio_deep_sleep_hold_en()`
+  and release the hold on wake. Without it, USB works but battery deep-sleep is dead.
+- **Power button.** On USB the board powers on automatically. On battery, **press
+  and hold PWR (~5 s)** to turn it on; a board that's already running hot-swaps to
+  battery when USB is pulled, no press needed. A long PWR press powers it off.
+
+### On-device debugging
+
+`src/main.cpp` has a `DEBUG_MODE` switch at the top. Set it to `1` and reflash for a
+build identical to production **except** it polls every `DEBUG_POLL_SECONDS` (20 s)
+and stamps the current time top-left, redrawing each poll — so you can watch it tick
+and confirm it's alive, including on battery. Set back to `0` for production.
 
 ## Build, flash, monitor (manual / low-level)
 
