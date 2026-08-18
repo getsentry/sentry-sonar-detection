@@ -5,7 +5,7 @@ import { StatusBadge, formatDuration, hoursLabel, relativeTime } from '../ui'
 import BusyHours from '../components/BusyHours'
 
 const POLL_MS = 10000
-const WINDOWS = [24, 168, 720] // 1d, 7d, 30d
+const WINDOWS = [24, 168, 672] // 1d, 7d, 28d (28 = exactly 4 weeks → clean office-hours totals)
 
 export default function RoomStatsPage() {
   const { id = '' } = useParams()
