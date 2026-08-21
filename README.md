@@ -50,6 +50,9 @@ dashboard/               React SPA (Vite) — served by the Worker as static ass
   (Cloudflare backend, dashboard, device tokens, firmware).
 - **[PLAN.md](./PLAN.md)** — design, data model, API surface, and the decisions
   behind them.
+- **[PRODUCTIONIZING.md](./PRODUCTIONIZING.md)** — current state and what a full
+  office-wide rollout would take (IoT Wi-Fi, display power, more pairs, Sentry-
+  hosted dashboard, and the operational gaps in between).
 - **[api/README.md](./api/README.md)** — API endpoints, deploy & operate, tokens.
 - **[firmware/README.md](./firmware/README.md)** — flashing sensors & displays,
   board pinouts, and the battery/power gotchas.
